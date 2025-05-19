@@ -33,6 +33,10 @@ class Logger {
   void fatal(const std::string& message, const Args&... args) const;
   void fatal(const std::string& message) const;
 
+  template<class... Args>
+  void debug(const std::string& message, const Args&... args) const;
+  void debug(const std::string& message) const;
+
   template<typename T>
   std::ostream& operator<<(const T& printable) const;
 
@@ -42,12 +46,17 @@ class Logger {
   static constexpr int DEFAULT_PRECISION = 3;
   static constexpr int NAME_PADDING = 15;
   static constexpr char RESET[] = "\033[0m";
+  static constexpr char BOLD[] = "\033[1m";
+  static constexpr char UNDERLINE[] = "\033[4m";
   static constexpr char RED[] = "\033[31m";
+  static constexpr char GREEN[] = "\033[32m";
   static constexpr char YELLOW[] = "\033[33m";
+  static constexpr char BLUE[] = "\033[34m";
   static constexpr char INFO[] = "Info:    ";
   static constexpr char WARN[] = "Warning: ";
   static constexpr char ERROR[] = "Error:   ";
   static constexpr char FATAL[] = "Fatal:   ";
+  static constexpr char DEBUG[] = "Debug:   ";
   //
   std::string name_;
   mutable std::ostream sink_;
@@ -92,6 +101,16 @@ void Logger::fatal(const std::string& message, const Args&... args) const {
     fatal(buf);
   else
     fatal("=== Logging error ===\n");
+}
+
+template<class... Args>
+void Logger::debug(const std::string& message, const Args&... args) const {
+  char buf[MAX_CHARS];
+  const int n = std::snprintf(buf, MAX_CHARS, message.c_str(), args...);
+  if (n >= 0 && n < MAX_CHARS)
+    debug(buf);
+  else
+    debug("=== Logging error ===\n");
 }
 
 template<typename T>

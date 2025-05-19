@@ -1,5 +1,7 @@
 #include "flightlib/objects/quadrotor.hpp"
 
+#include <iostream>
+
 namespace flightlib {
 
 Quadrotor::Quadrotor(const std::string &cfg_path)
@@ -11,6 +13,7 @@ Quadrotor::Quadrotor(const std::string &cfg_path)
 
   // create quadrotor dynamics and update the parameters
   dynamics_.updateParams(cfg);
+  base_controller_params_.loadDefaultParams();
   init();
 }
 
@@ -19,10 +22,61 @@ Quadrotor::Quadrotor(const QuadrotorDynamics &dynamics)
     dynamics_(dynamics),
     size_(1.0, 1.0, 1.0),
     collision_(false) {
+  base_controller_params_.loadDefaultParams();
   init();
 }
 
 Quadrotor::~Quadrotor() {}
+
+
+// bool Quadrotor::velocityControlBody(const Command &cmd, const Scalar ctl_dt) {
+//   if (!cmd.isVelocity()) return false;
+//   if (!state_.valid()) return false;
+
+//   Scalar YAW_GAIN = 0.85;
+  
+
+// }
+
+bool Quadrotor::velocityControl(const Command &cmd, const Scalar ctl_dt) {
+  if (!cmd.isVelocity()) return false;
+  if (!state_.valid()) return false;
+  // REVIEW: 初始化time_last [need test]
+  if (time_last_velocity_command_handled_ < 0) {
+    time_last_velocity_command_handled_ = cmd.t;
+  }
+  const Scalar dt = 
+    (cmd.t - time_last_velocity_command_handled_);
+  const Scalar alpha_velocity = 1 - exp(-dt / tau_velocity_command_);
+
+  const Vector<3> commanded_velocity = cmd.linear;
+  reference_state_.velocity =
+    (1.0 - alpha_velocity) * reference_state_.velocity +
+    alpha_velocity * commanded_velocity;
+
+  if (reference_state_.velocity.norm() < kVelocityCommandZeroThreshold_ &&
+      commanded_velocity.norm() < kVelocityCommandZeroThreshold_) {
+    reference_state_.velocity = Vector<3>::Zero();
+    if (fabs(cmd.angular(2)) < kVelocityCommandZeroThreshold_) {
+      reference_state_.heading_rate = 0.0;
+    }
+  }
+  reference_state_.position += reference_state_.velocity * dt;
+
+  reference_state_.heading += cmd.angular(2) * dt;
+  reference_state_.heading =
+    flightlib::wrapMinusPiToPi(reference_state_.heading);
+  reference_state_.heading_rate = cmd.angular(2);
+  time_last_velocity_command_handled_ = cmd.t;
+
+  reference_trajectory_ = Trajectory(reference_state_);
+  Command command = base_controller_.run(state_, reference_trajectory_,
+                                         base_controller_params_);
+
+  command.t = cmd.t;
+
+  return run(command, ctl_dt);
+}
 
 bool Quadrotor::run(const Command &cmd, const Scalar ctl_dt) {
   if (!setCommand(cmd)) return false;
@@ -94,6 +148,12 @@ bool Quadrotor::reset(const QuadState &state) {
   state_ = state;
   motor_omega_.setZero();
   motor_thrusts_.setZero();
+  reference_state_ = TrajectoryPoint();
+  reference_state_.position = state.p;
+  // Vector<3> euler_zyx = state.q().toRotationMatrix().eulerAngles(2, 1, 0);
+  // reference_state_.heading = euler_zyx.x();
+  Vector<3> euler_xyz = state.euler_xyz();
+  reference_state_.heading = euler_xyz.z();
   return true;
 }
 

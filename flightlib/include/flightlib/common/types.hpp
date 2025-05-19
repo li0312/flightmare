@@ -1,3 +1,11 @@
+/*** 
+ * @Author: Flightmare
+ * @Date: 2024-11-27 17:32:59 +0800
+ * @LastEditTime: 2025-05-16 16:15:46 +0800
+ * @LastEditors: Lac_Creeper
+ * @Description: 
+ * @FilePath: /src/flightmare/flightlib/include/flightlib/common/types.hpp
+ */
 #pragma once
 
 #include <eigen3/Eigen/Eigen>
@@ -32,6 +40,9 @@ using MatrixRowMajor = Eigen::Matrix<Scalar, rows, cols, Eigen::RowMajor>;
 // Using shorthand for `Vector<rows>` with scalar type.
 template<int rows = Dynamic>
 using Vector = Matrix<rows, 1>;
+
+// Vector int 
+using Vector2i = Eigen::Vector2i;
 
 // Vector bool
 template<int rows = Dynamic>

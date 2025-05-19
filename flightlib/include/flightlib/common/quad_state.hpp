@@ -71,6 +71,7 @@ struct QuadState {
 
   inline static int size() { return SIZE; }
   Quaternion q() const;
+  Vector<3> euler_xyz() const;
   void q(const Quaternion quaternion);
   Matrix<3, 3> R() const;
   void setZero();

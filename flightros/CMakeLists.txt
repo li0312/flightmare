@@ -6,6 +6,12 @@ find_package(catkin_simple REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
+# Including dependencies PCL
+find_package(PCL 1.10 REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 option(BUILD_MP "Build Motion Planning" OFF)
 
 catkin_simple()
@@ -145,6 +151,20 @@ cs_add_executable(camera
 target_link_libraries(camera
 ${catkin_LIBRARIES}
 ${OpenCV_LIBRARIES}
+stdc++fs
+zmq
+zmqpp
+)
+
+# lac_test
+cs_add_executable(vel_control_test
+    src/lac_test/vel_control_test.cpp
+)
+
+target_link_libraries(vel_control_test
+${catkin_LIBRARIES}
+${OpenCV_LIBRARIES}
+${PCL_LIBRARIES}
 stdc++fs
 zmq
 zmqpp

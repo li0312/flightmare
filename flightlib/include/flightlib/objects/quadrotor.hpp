@@ -5,9 +5,12 @@
 // flightlib
 #include "flightlib/common/command.hpp"
 #include "flightlib/common/integrator_rk4.hpp"
+#include "flightlib/common/trajectory.hpp"
+#include "flightlib/common/trajectory_point.hpp"
 #include "flightlib/common/types.hpp"
 #include "flightlib/dynamics/quadrotor_dynamics.hpp"
 #include "flightlib/objects/object_base.hpp"
+#include "flightlib/position_controller/position_controller.hpp"
 #include "flightlib/sensors/imu.hpp"
 #include "flightlib/sensors/rgb_camera.hpp"
 
@@ -26,6 +29,7 @@ class Quadrotor : ObjectBase {
   void init(void);
 
   // run the quadrotor
+  bool velocityControl(const Command& cmd, const Scalar ctl_dt);
   bool run(const Scalar dt) override;
   bool run(const Command& cmd, const Scalar dt);
 
@@ -94,6 +98,17 @@ class Quadrotor : ObjectBase {
 
   // auxiliary variables
   Matrix<3, 2> world_box_;
+
+  // velocity control
+  PositionController base_controller_;
+  PositionControllerParams base_controller_params_;
+  TrajectoryPoint reference_state_;
+  Trajectory reference_trajectory_;
+  // velocity control parameters and constants
+  Scalar tau_velocity_command_ = 0.8;
+  Scalar time_last_velocity_command_handled_ = -1;
+  static constexpr Scalar kVelocityCommandZeroThreshold_ = 0.03;
+  
 };
 
 }  // namespace flightlib

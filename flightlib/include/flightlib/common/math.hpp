@@ -1,3 +1,11 @@
+/*** 
+ * @Author: Flightmare
+ * @Date: 2024-11-27 17:32:59 +0800
+ * @LastEditTime: 2025-05-15 13:20:17 +0800
+ * @LastEditors: Lac_Creeper
+ * @Description: 
+ * @FilePath: /src/flightmare/flightlib/include/flightlib/common/math.hpp
+ */
 #pragma once
 
 #include "flightlib/common/types.hpp"
@@ -44,5 +52,9 @@ std::vector<Scalar> positionRos2Unity(const Vector<3>& ros_pos_vec);
 std::vector<Scalar> quaternionRos2Unity(const Quaternion& ros_quat);
 
 std::vector<Scalar> scalarRos2Unity(const Vector<3>& ros_scale);
+
+Scalar wrapZeroToTwoPi(const Scalar angle);
+
+Scalar wrapMinusPiToPi(const Scalar angle);
 
 }  // namespace flightlib

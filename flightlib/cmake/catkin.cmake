@@ -7,12 +7,19 @@ add_definitions(-std=c++17)
 
 # Library and Executables
 cs_add_library(${PROJECT_NAME} ${FLIGHTLIB_SOURCES})
+
+set_source_files_properties(
+    src/sensors/lidar.cpp
+    PROPERTIES COMPILE_FLAGS "-use_fast_math"
+)
+
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${BLAS_LIBRARIES}
   ${LAPACK_LIBRARIES}
   ${LAPACKE_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}
   yaml-cpp
   zmq
   zmqpp

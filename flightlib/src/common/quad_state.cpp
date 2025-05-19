@@ -1,3 +1,11 @@
+/*** 
+ * @Author: Flightmare
+ * @Date: 2024-11-27 17:32:59 +0800
+ * @LastEditTime: 2025-05-15 20:28:22 +0800
+ * @LastEditors: Lac_Creeper
+ * @Description: 
+ * @FilePath: /src/flightmare/flightlib/src/common/quad_state.cpp
+ */
 #include "flightlib/common/quad_state.hpp"
 
 namespace flightlib {
@@ -12,6 +20,12 @@ QuadState::~QuadState() {}
 
 Quaternion QuadState::q() const {
   return Quaternion(x(ATTW), x(ATTX), x(ATTY), x(ATTZ));
+}
+
+Vector<3> QuadState::euler_xyz() const {
+  // Vector<3> euler_xyz = q().toRotationMatrix().eulerAngles(0, 1, 2);
+  // return Vector<3>{euler_xyz(0), euler_xyz(1), euler_xyz(2)};
+  return q().toRotationMatrix().eulerAngles(0, 1, 2);
 }
 
 void QuadState::q(const Quaternion quaternion) {
@@ -33,7 +47,13 @@ void QuadState::setZero() {
 
 std::ostream& operator<<(std::ostream& os, const QuadState& state) {
   os.precision(3);
-  os << "State at " << state.t << "s: [" << state.x.transpose() << "]";
+  os << "State at " << state.t << "s: \n"
+     << "[POS]: [" << state.p.transpose() << "]\n"
+     << "[ATT]: [" << state.euler_xyz().transpose() << "]\n"
+     << "[VEL]: [" << state.v.transpose() << "]\n"
+     << "[OMG]: [" << state.w.transpose() << "]\n"
+     << "[ACC]: [" << state.a.transpose() << "]\n"
+     << "[TAU]: [" << state.tau.transpose() << "]\n";
   os.precision();
   return os;
 }

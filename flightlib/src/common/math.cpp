@@ -195,4 +195,25 @@ std::vector<Scalar> scalarRos2Unity(const Vector<3>& ros_scalar) {
   return unity_scalar;
 }
 
+Scalar wrapZeroToTwoPi(const Scalar angle) {
+  if (angle >= 0.0 && angle <= 2.0 * M_PIl) {
+    return angle;
+  }
+  Scalar wrapped_angle = fmod(angle, 2.0 * M_PIl);
+  if (wrapped_angle < 0.0) {
+    wrapped_angle += 2.0 * M_PIl;
+  }
+  return wrapped_angle;
+}
+
+Scalar wrapMinusPiToPi(const Scalar angle) {
+  if (angle >= -M_PIl && angle <= M_PIl) {
+    return angle;
+  }
+  Scalar wrapped_angle = angle + M_PIl;
+  wrapped_angle = wrapZeroToTwoPi(wrapped_angle);
+  wrapped_angle -= M_PIl;
+  return wrapped_angle;
+}
+
 }  // namespace flightlib

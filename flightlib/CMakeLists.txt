@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.0)
 
 project(flightlib VERSION 0.1.0)
 
+# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3 -use_fast_math")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3")
+
 message(STATUS "======================  !Flightmare!  ======================")
 
 ################################################################################
@@ -46,6 +49,12 @@ message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
 include(cmake/pybind11.cmake)
 include(cmake/yaml.cmake)
 
+# Including dependencies PCL
+find_package(PCL 1.10 REQUIRED)
+add_definitions(${PCL_DEFINITIONS})
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+
 # Including dependencies 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -86,6 +95,7 @@ message(STATUS "======> Setup Compilation")
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1048576)
 include_directories(${EIGEN_INCLUDE_DIR} "tests")
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${PCL_INCLUDE_DIRS})
 
 # Set default build type
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
@@ -147,6 +157,7 @@ file(GLOB_RECURSE FLIGHTLIB_SOURCES
   src/sensors/*.cpp
   src/envs/*.cpp
   src/common/*.cpp
+  src/position_controller/*.cpp
 )
 
 # Create file lists for flightlib tests
@@ -203,6 +214,7 @@ else()
   add_library(${PROJECT_NAME} ${FLIGHTLIB_SOURCES})
   target_link_libraries(${PROJECT_NAME} PRIVATE
     ${OpenCV_LIBRARIES}
+    ${PCL_LIBRARIES}
     yaml-cpp
     zmq
     zmqpp

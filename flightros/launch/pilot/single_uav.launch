@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="mav_name" default="hummingbird"/>
+  <!-- <arg name="model" default="$(find rotors_description)/urdf/mav_generic_odometry_sensor.gazebo"/> -->
+  <arg name="model" default="$(find rotors_description)/urdf/mav_with_rgb.gazebo"/>
+  <arg name="enable_logging" default="false"/>
+  <arg name="enable_ground_truth" default="true"/>
+  <arg name="log_file" default="$(arg mav_name)"/>
+  <arg name="enable_command_feedthrough" default="false"/>
+
+  <arg name="ID" default="0"/>
+  <arg name="init_x" default="0"/>
+  <arg name="init_y" default="0"/>
+    <include file="$(find rotors_gazebo)/launch/spawn_mav_lac.launch">
+      <arg name="mav_name" value="$(arg mav_name)" />
+      <arg name="ID" value="$(arg ID)"/>
+      <arg name="model" value="$(arg model)" />
+      <arg name="enable_logging" value="$(arg enable_logging)" />
+      <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
+      <arg name="log_file" value="$(arg log_file)"/>
+      <arg name="x" value="$(arg init_x)" />
+      <arg name="y" value="$(arg init_y)" />
+    </include>
+
+    <!-- RPG RotorS interface. -->
+    <node pkg="rpg_rotors_interface" type="rpg_rotors_interface"
+        name="rpg_rotors_interface" output="screen" >
+      <rosparam file="$(find rpg_rotors_interface)/parameters/rpg_rotors_interface.yaml" />
+      <!-- .. -->
+      <remap from="odometry" to="ground_truth/odometry" />
+      <remap from="rpg_rotors_interface/arm" to="bridge/arm" />
+    </node>
+
+    <!-- Autopilot -->
+    <node pkg="autopilot" type="autopilot" name="autopilot" output="screen">
+      <rosparam file="$(find state_predictor)/parameters/hummingbird.yaml" />
+      <rosparam file="$(find rpg_rotors_interface)/parameters/position_controller.yaml" />
+      <rosparam file="$(find rpg_rotors_interface)/parameters/autopilot.yaml" />
+
+      <param name="position_controller/use_rate_mode" value="True" />
+
+      <param name="velocity_estimate_in_world_frame" value="false" />
+      <param name="state_estimate_timeout" value="0.1" />
+      <param name="control_command_delay" value="0.05" />
+      <!-- <param name="optitrack_start_height" value="2.0" /> -->
+      <!-- <param name="optitrack_start_land_timeout" value="7.0" /> -->
+      <param name="enable_command_feedthrough" value="$(arg enable_command_feedthrough)" />
+
+      <remap from="autopilot/state_estimate" to="local/odometry" />
+    </node>
+
+    <node pkg="laser_simulator" type="transmit_odom_node" name="transmit_odom_node" output="screen">
+        <remap from="/drone0/odom" to="ground_truth/odometry"/>
+        <remap from="/my_odometry" to="local/odometry"/>
+    </node>
+
+    <node pkg="laser_simulator" type="laser_sim_node" name="laser_simulator" output="screen">
+        <rosparam file="$(find laser_simulator)/launch/params.yaml" command="load" />
+        <remap from="/my_odometry" to="local/odometry"/>
+    </node>
+
+    <!-- <node pkg="flightros" type="flight_pilot_node" name="flight_pilot_node" output="screen">
+      <rosparam file="$(find flightros)/params/default.yaml" />
+      <remap from="flight_pilot/state_estimate" to="ground_truth/odometry" />
+    </node> -->
+</launch>

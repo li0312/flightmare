@@ -1,0 +1,373 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="quad_name" default="hummingbird"/>
+
+  <arg name="mav_name" default="$(arg quad_name)"/>
+  <arg name="model" value="$(find rotors_description)/urdf/mav_generic_odometry_sensor.gazebo"/>
+  <arg name="world_name" default="$(find rotors_gazebo)/worlds/basic.world"/>
+
+  <arg name="use_unity_editor" default="false" />
+  <arg name="paused" value="true"/>
+  <arg name="gui" value="true"/>
+  <arg name="use_ground_truth" default="true"/>
+  <arg name="enable_ground_truth" default="true"/>
+  <arg name="enable_command_feedthrough" default="false"/>
+  <arg name="custom_models" default=""/>
+
+  <arg name="enable_logging" default="false"/>
+  <arg name="log_file" default="$(arg mav_name)"/>
+
+  <arg name="x_init" default="0"/>
+  <arg name="y_init" default="0"/>
+
+  <arg name="debug" default="false"/>
+  <arg name="verbose" default="false"/>
+
+  <param name="use_sim_time" value="true"/>
+
+  <!-- Gazebo stuff to spawn the world !-->
+  <env name="GAZEBO_MODEL_PATH"
+      value="${GAZEBO_MODEL_PATH}:$(find rotors_gazebo)/models:$(arg custom_models)"/>
+  <env name="GAZEBO_RESOURCE_PATH"
+      value="${GAZEBO_RESOURCE_PATH}:$(find rotors_gazebo)/models"/>
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world_name)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="paused" value="$(arg paused)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="verbose" value="$(arg verbose)"/>
+  </include>
+
+  <node name="rqt_quad_gui" pkg="rqt_gui" type="rqt_gui"
+    args="-s rqt_quad_gui.basic_flight.BasicFlight --args
+    --quad_name $(arg quad_name)" output="screen"/>
+
+  <!-- RPG Flightmare Unity Render. -->
+  <!-- <node pkg="flightrender" type="RPG_Flightmare.x86_64" name="rpg_flightmare_render" unless="$(arg use_unity_editor)">
+  </node> -->
+
+  <!-- RPG stuff !-->
+  <group ns="hummingbird_0">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="0"/>
+      <arg name="init_x" value="2"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <!--<group ns="hummingbird_1">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="1"/>
+      <arg name="init_x" value="1"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_2">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="2"/>
+      <arg name="init_x" value="2"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_3">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="3"/>
+      <arg name="init_x" value="3"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_4">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="4"/>
+      <arg name="init_x" value="4"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_5">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="5"/>
+      <arg name="init_x" value="5"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_6">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="6"/>
+      <arg name="init_x" value="6"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_7">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="7"/>
+      <arg name="init_x" value="7"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_8">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="8"/>
+      <arg name="init_x" value="8"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_9">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="9"/>
+      <arg name="init_x" value="9"/>
+      <arg name="init_y" value="0"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_10">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="10"/>
+      <arg name="init_x" value="0"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_11">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="11"/>
+      <arg name="init_x" value="1"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_12">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="12"/>
+      <arg name="init_x" value="2"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_13">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="13"/>
+      <arg name="init_x" value="3"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_14">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="14"/>
+      <arg name="init_x" value="4"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_15">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="15"/>
+      <arg name="init_x" value="5"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_16">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="16"/>
+      <arg name="init_x" value="6"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_17">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="17"/>
+      <arg name="init_x" value="7"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_18">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="18"/>
+      <arg name="init_x" value="8"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_19">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="19"/>
+      <arg name="init_x" value="9"/>
+      <arg name="init_y" value="1"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_20">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="20"/>
+      <arg name="init_x" value="0"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_21">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="21"/>
+      <arg name="init_x" value="1"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_22">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="22"/>
+      <arg name="init_x" value="2"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_23">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="23"/>
+      <arg name="init_x" value="3"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_24">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="24"/>
+      <arg name="init_x" value="4"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_25">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="25"/>
+      <arg name="init_x" value="5"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_26">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="26"/>
+      <arg name="init_x" value="6"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_27">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="27"/>
+      <arg name="init_x" value="7"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_28">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="28"/>
+      <arg name="init_x" value="8"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_29">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="29"/>
+      <arg name="init_x" value="9"/>
+      <arg name="init_y" value="2"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_30">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="30"/>
+      <arg name="init_x" value="0"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_31">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="31"/>
+      <arg name="init_x" value="1"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_32">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="32"/>
+      <arg name="init_x" value="2"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_33">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="33"/>
+      <arg name="init_x" value="3"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_34">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="34"/>
+      <arg name="init_x" value="4"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_35">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="35"/>
+      <arg name="init_x" value="5"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_36">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="36"/>
+      <arg name="init_x" value="6"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_37">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="37"/>
+      <arg name="init_x" value="7"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_38">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="38"/>
+      <arg name="init_x" value="8"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group>
+
+  <group ns="hummingbird_39">
+    <include file="$(find flightros)/launch/pilot/single_uav.launch">
+      <arg name="ID" value="39"/>
+      <arg name="init_x" value="9"/>
+      <arg name="init_y" value="3"/>
+    </include>
+  </group> -->
+
+
+
+
+</launch>

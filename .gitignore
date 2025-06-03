@@ -10,6 +10,8 @@ __pycache__
 # VScode
 .vscode/
 .vscode/*
+.history/
+.history/*
 **/.vscode/*
 !.vscode/extensions.json
 

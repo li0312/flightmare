@@ -1,0 +1,8 @@
+<launch>
+
+    <node name="lidar2d_sim" pkg="flightros" type="lidar2d_sim" output="screen">
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find flightros)/launch/lac_test/lidar2d_test.rviz"/>
+
+</launch>

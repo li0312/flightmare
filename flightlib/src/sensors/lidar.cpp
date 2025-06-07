@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-16 16:52:43 +0800
- * @LastEditTime: 2025-05-29 23:30:31 +0800
+ * @LastEditTime: 2025-06-03 17:00:49 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/sensors/lidar.cpp
@@ -193,7 +193,7 @@ bool Lidar::renderPointCloud(const QuadState& state) {
   return true;
 }
 
-bool Lidar::renderLaserScan(const QuadState& state) {
+bool Lidar::renderLaserScan(const QuadState& state, bool is_norm) {
   if (!renderPointCloud(state)) {
     logger_.error("No pointcloud!!");
     return false;
@@ -202,8 +202,11 @@ bool Lidar::renderLaserScan(const QuadState& state) {
 
   laserscan_.clear();
   uint32_t ranges_size = std::ceil(2.0 * half_hrz_range_ / hrz_resolution_rad_);
-  // laserscan_.assign(ranges_size, scan_range_max_);
-  laserscan_.assign(ranges_size, 1.0f);
+  if (is_norm) {
+    laserscan_.assign(ranges_size, 0.5f);
+  } else {
+    laserscan_.assign(ranges_size, scan_range_max_);
+  }
 
   // Iterate through pointcloud
   for (const auto& point : local_map_) {
@@ -215,11 +218,13 @@ bool Lidar::renderLaserScan(const QuadState& state) {
     if (range < scan_range_min_ || range > scan_range_max_)
       continue;
     Scalar angle = atan2(point.y, point.x);
-    // overwrite range at laserscan ray if new range is smaller
+    if (is_norm) {
+      range = range/scan_range_max_ - 0.5f;
+    }
+    /// overwrite range at laserscan ray if new range is smaller
     int index = (angle + half_hrz_range_) / hrz_resolution_rad_;
     if (range < laserscan_[index]) {
-      // laserscan_[index] = range;
-      laserscan_[index] = range/scan_range_max_ - 0.5f;
+      laserscan_[index] = range;
     }
   }
 
@@ -233,11 +238,11 @@ bool Lidar::renderLaserScan(const QuadState& state) {
 
 }
 
-const pcl::PointCloud<pcl::PointXYZ>::Ptr& Lidar::getlocalCloud() const {
-  return local_map_.makeShared();
+const pcl::PointCloud<pcl::PointXYZ>& Lidar::getlocalCloud() const {
+  return local_map_;
 }
-const pcl::PointCloud<pcl::PointXYZ>::Ptr& Lidar::getGlobalMap() const {
-  return cloud_all_map_.makeShared();
+const pcl::PointCloud<pcl::PointXYZ>& Lidar::getGlobalMap() const {
+  return cloud_all_map_;
 }
 
 const std::vector<Scalar>& Lidar::getScan() const {

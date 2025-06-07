@@ -170,6 +170,19 @@ zmq
 zmqpp
 )
 
+# lac_test
+cs_add_executable(lidar2d_sim
+    src/lac_test/lidar2d_sim.cpp
+)
+
+target_link_libraries(lidar2d_sim
+${catkin_LIBRARIES}
+${OpenCV_LIBRARIES}
+stdc++fs
+zmq
+zmqpp
+)
+
 # Finish
 cs_install()
 cs_export()

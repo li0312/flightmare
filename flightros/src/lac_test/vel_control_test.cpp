@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 13:06:03 +0800
- * @LastEditTime: 2025-05-26 16:12:54 +0800
+ * @LastEditTime: 2025-06-03 16:49:18 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightros/src/lac_test/vel_control_test.cpp
@@ -158,9 +158,9 @@ int main(int argc, char *argv[]) {
 
     const auto& global_map = lidar_test.getGlobalMap();
     sensor_msgs::PointCloud2 global_map_msg;
-    pcl::toROSMsg(*global_map, global_map_msg);
+    pcl::toROSMsg(global_map, global_map_msg);
     global_map_msg.header.frame_id = "world";
-    ROS_INFO("Map point size = %ld", global_map->points.size());
+    ROS_INFO("Map point size = %ld", global_map.points.size());
     for (int count = 0; count < 2; ++count) {
       map_pub.publish(global_map_msg);
       ros::Duration(0.2).sleep();
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
       quadstateToROSMsg(state4test, odom_msg);
       odom_pub.publish(odom_msg);
       const auto& local_cloud = lidar_test.getlocalCloud();
-      pcl::toROSMsg(*local_cloud, local_cloud_msg);
+      pcl::toROSMsg(local_cloud, local_cloud_msg);
       local_cloud_msg.header.stamp = odom_msg.header.stamp;
       local_cloud_msg.header.frame_id = "laser";
       cloud_pub.publish(local_cloud_msg);

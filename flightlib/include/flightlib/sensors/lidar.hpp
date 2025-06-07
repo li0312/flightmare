@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-16 15:13:22 +0800
- * @LastEditTime: 2025-05-29 14:42:22 +0800
+ * @LastEditTime: 2025-06-03 16:55:31 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/include/flightlib/sensors/lidar.hpp
@@ -46,12 +46,12 @@ class Lidar : SensorBase {
 
     // public get functions
     bool renderPointCloud(const QuadState& state);
-    bool renderLaserScan(const QuadState &state);
+    bool renderLaserScan(const QuadState &state, bool is_norm = false);
 
     void loadClobalPCFromPLY();
 
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& getlocalCloud() const;
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& getGlobalMap() const;
+    const pcl::PointCloud<pcl::PointXYZ>& getlocalCloud() const;
+    const pcl::PointCloud<pcl::PointXYZ>& getGlobalMap() const;
     const std::vector<Scalar>& getScan() const;
     bool isCollision();
 

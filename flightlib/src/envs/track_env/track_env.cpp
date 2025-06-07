@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-23 15:11:53 +0800
- * @LastEditTime: 2025-05-31 10:40:01 +0800
+ * @LastEditTime: 2025-06-03 16:56:25 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/envs/track_env/track_env.cpp
@@ -108,7 +108,7 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
   // logger_.debug("getObs start..");
 
   quadrotor_ptr_->getState(&quad_state_);
-  lidar_.renderLaserScan(quad_state_);
+  lidar_.renderLaserScan(quad_state_, true);
   const auto &scan_data = lidar_.getScan();
   Vector<trackenv::kNLaser1> scan = 
           Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());

@@ -1,10 +1,10 @@
 /*** 
  * @Author: Flightmare
  * @Date: 2024-11-27 17:32:59 +0800
- * @LastEditTime: 2025-05-16 16:15:46 +0800
+ * @LastEditTime: 2025-06-06 22:08:01 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /src/flightmare/flightlib/include/flightlib/common/types.hpp
+ * @FilePath: /flightmare/flightlib/include/flightlib/common/types.hpp
  */
 #pragma once
 
@@ -44,6 +44,9 @@ using Vector = Matrix<rows, 1>;
 // Vector int 
 using Vector2i = Eigen::Vector2i;
 
+// AlignedBox 2 int
+using AlignedBox2f = Eigen::AlignedBox<Scalar, 2>;
+
 // Vector bool
 template<int rows = Dynamic>
 using BoolVector = Eigen::Matrix<bool, -1, 1>;
@@ -75,5 +78,6 @@ using Map = Eigen::Map<Derived>;
 
 static constexpr Scalar Gz = -9.81;
 const Vector<3> GVEC{0.0, 0.0, Gz};
+static constexpr Scalar EPSILON = 1e-9;
 
 }  // namespace flightlib

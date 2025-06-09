@@ -27,6 +27,7 @@ class Obstacle {
   virtual bool rayIntersect(const Vector<2>& origin, const Vector<2>& dir,
                             Scalar maxDist, Scalar& t) const = 0;
   virtual Scalar distanceToPoint(const Vector<2>& point) const = 0;
+  virtual bool containsPoint(const Vector<2>& point) const = 0;
 };
 
 class Rectangle : public Obstacle {
@@ -52,6 +53,8 @@ class Rectangle : public Obstacle {
                     Scalar maxDist, Scalar& t) const override;
 
   Scalar distanceToPoint(const Vector<2>& point) const override;
+
+  bool containsPoint(const Vector<2>& point) const override;
 };
 
 
@@ -75,6 +78,8 @@ class Ellipse : public Obstacle {
                     Scalar maxDist, Scalar& t) const override;
 
   Scalar distanceToPoint(const Vector<2>& point) const override;
+
+  bool containsPoint(const Vector<2>& point) const override;
 };
 
 class AABBTree {
@@ -102,14 +107,24 @@ class AABBTree {
                     Scalar maxDist, Scalar& t) const;
 };
 
-class ObstacleMap {
+class Lidar2D {
   std::vector<std::shared_ptr<Obstacle>> obstacles_;
   AABBTree aabbTree_;
   AlignedBox2f mapBounds_;
   bool treeBuilt_ = false;
 
+  Logger logger_{"lidar2d"};
+
+  /// Lidar parameters
+  Scalar fov_;
+  int numRays_;
+  Scalar maxRange_;
+  Scalar safe_range_;
+  bool is_collision_;
+
  public:
-  ObstacleMap(Scalar width, Scalar height);
+  Lidar2D(Scalar mapWidth, Scalar mapHeight, Scalar fov, int numRays,
+          Scalar maxRange, Scalar safe_range);
 
   void addRectangle(Vector<2> center, Scalar width, Scalar height,
                     Scalar angle);
@@ -119,12 +134,21 @@ class ObstacleMap {
   void buildTree();
 
   // 生成随机地图
-  void generateRandomMap(int numRectangles, int numEllipses);
+  void generateRandomMap(int numRectangles, int numEllipses,
+                         int MAX_ATTEMPTS = 100);
 
   // 高效的激光雷达模拟
-  std::vector<Scalar> simulateLidar(const Vector<2>& robotPos,
-                                    Scalar robotAngle, Scalar fov, int numRays,
-                                    Scalar maxRange);
+  bool simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
+                     std::vector<Scalar>& ranges, bool is_norm = false);
+
+  bool simulateLidar(const QuadState& state, std::vector<Scalar>& ranges,
+                     bool is_norm = false);
+
+  const std::vector<std::shared_ptr<Obstacle>>& getObstacles() const;
+
+  std::vector<std::shared_ptr<Obstacle>>& getObstacles();
+
+  bool isCollision();
 };
 
 }  // namespace flightlib

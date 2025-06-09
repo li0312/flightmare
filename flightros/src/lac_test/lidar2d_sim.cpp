@@ -25,11 +25,11 @@ class ObstacleLidarSim {
  public:
   ObstacleLidarSim() : nh_("~") {
     // 参数
-    nh_.param("map_width", map_width_, (Scalar)100.0);
-    nh_.param("map_height", map_height_, (Scalar)100.0);
+    nh_.param("map_width", map_width_, (Scalar)20.0);
+    nh_.param("map_height", map_height_, (Scalar)20.0);
     nh_.param("num_rectangles", num_rectangles_, 50);
     nh_.param("num_ellipses", num_ellipses_, 30);
-    nh_.param("lidar_fov", lidar_fov_, (Scalar)(2 * M_PI * 270 / 360));
+    nh_.param("lidar_fov", lidar_fov_, (Scalar)(2 * M_PI));
     nh_.param("lidar_num_rays", lidar_num_rays_, 512);
     nh_.param("lidar_max_range", lidar_max_range_, (Scalar)10.0);
     nh_.param("robot_init_x", robotPos_.x(), (Scalar)0.0);
@@ -47,8 +47,17 @@ class ObstacleLidarSim {
     timer_ =
       nh_.createTimer(ros::Duration(0.01), &ObstacleLidarSim::update, this);
 
-    // 初始化地图
-    initializeMap();
+
+    lidar2d_sim_.generateRandomMap(50, 50);
+    obstacles_ = lidar2d_sim_.getObstacles();
+    // // 初始化地图
+    // for (int i = 0; i < 200; ++i) {
+    //   map_timer_.tic();
+    //   obstacles_.clear();
+    //   initializeMap();
+    //   map_timer_.toc();
+    // }
+    // std::cout << map_timer_ << std::endl;
   }
 
 
@@ -61,7 +70,7 @@ class ObstacleLidarSim {
     std::cout << "[YAW]: " << robotYaw_ << std::endl;
   }
 
-  void initializeMap() {
+  void initializeMap(const int MAX_ATTEMPTS = 100) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<Scalar> posX(-map_width_ / 2,
@@ -70,43 +79,81 @@ class ObstacleLidarSim {
     std::uniform_real_distribution<Scalar> posY(-map_height_ / 2,
                                                 map_height_ / 2);
     // std::uniform_real_distribution<Scalar> posY(0, map_height_);
-    std::uniform_real_distribution<Scalar> size(1.0, 5.0);
+    std::uniform_real_distribution<Scalar> size(0.1, 1.0);
     std::uniform_real_distribution<Scalar> angle(0, M_PI);
 
     // 添加随机矩形
     for (int i = 0; i < num_rectangles_; ++i) {
-      auto rect = std::make_shared<Rectangle>(Vector<2>(posX(gen), posY(gen)),
-                                              size(gen), size(gen), angle(gen));
-      obstacles_.push_back(rect);
+      bool is_placed = false;
+      for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+        Scalar cx = posX(gen);
+        Scalar cy = posY(gen);
+        Scalar width = size(gen);
+        Scalar height = size(gen);
+        Scalar yaw = angle(gen);
+        auto rect =
+          std::make_shared<Rectangle>(Vector<2>{cx, cy}, width, height, yaw);
+        bool collision = false;
+        for (const auto& existing : obstacles_) {
+          if (rect->getBBox().intersects(existing->getBBox())) {
+            collision = true;
+            break;
+          }
+        }
+        if (!collision) {
+          obstacles_.push_back(rect);
+          // treeBuilt_ = false;  // 需要重建树
+          is_placed = true;
+          break;
+        }
+      }
+      if (!is_placed) std::cerr << "无法放置长方体 " << i << std::endl;
     }
 
     // 添加随机椭圆
     for (int i = 0; i < num_ellipses_; ++i) {
-      Scalar a = size(gen);
-      Scalar b = size(gen) / 2.0;  // 使椭圆更扁平
-      if (b > a) std::swap(a, b);
-
-      auto ellipse = std::make_shared<Ellipse>(Vector<2>(posX(gen), posY(gen)),
-                                               a, b, angle(gen));
-      obstacles_.push_back(ellipse);
+      bool is_placed = false;
+      for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+        Scalar cx = posX(gen);
+        Scalar cy = posY(gen);
+        Scalar a = size(gen);
+        Scalar b = size(gen);
+        if (b > a) std::swap(a, b);  // 确保a是长轴
+        Scalar yaw = angle(gen);
+        auto ellipse = std::make_shared<Ellipse>(Vector<2>{cx, cy}, a, b, yaw);
+        bool collision = false;
+        for (const auto& existing : obstacles_) {
+          if (ellipse->getBBox().intersects(existing->getBBox())) {
+            collision = true;
+            break;
+          }
+        }
+        if (!collision) {
+          obstacles_.push_back(ellipse);
+          // treeBuilt_ = false;  // 需要重建树
+          is_placed = true;
+          break;
+        }
+      }
+      if (!is_placed) std::cerr << "无法放置圆柱体 " << i << std::endl;
     }
   }
 
   void update(const ros::TimerEvent&) {
-    robotYaw_ += 0.002;
+    // robotYaw_ += 0.002;
 
     step_ += 1;
-    if ((step_ % 4000) < 500) {
-      robotPos_.x() += 0.01;
-    } else if ((step_ % 4000) < 1500) {
-      robotPos_.y() += 0.01;
-    } else if ((step_ % 4000) < 2500) {
-      robotPos_.x() -= 0.01;
-    } else if ((step_ % 4000) < 3500) {
-      robotPos_.y() -= 0.01;
-    } else {
-      robotPos_.x() += 0.01;
-    }
+    // if ((step_ % 4000) < 500) {
+    //   robotPos_.x() += 0.01;
+    // } else if ((step_ % 4000) < 1500) {
+    //   robotPos_.y() += 0.01;
+    // } else if ((step_ % 4000) < 2500) {
+    //   robotPos_.x() -= 0.01;
+    // } else if ((step_ % 4000) < 3500) {
+    //   robotPos_.y() -= 0.01;
+    // } else {
+    //   robotPos_.x() += 0.01;
+    // }
 
     // 发布TF (假设机器人在地图中心)
     static tf::TransformBroadcaster br;
@@ -121,7 +168,21 @@ class ObstacleLidarSim {
 
     lidar_timer_.tic();
     // 模拟激光雷达数据
-    simulateLidar();
+    // simulateLidar();
+
+    sensor_msgs::LaserScan scan;
+    scan.header.stamp = ros::Time::now();
+    scan.header.frame_id = "base_laser";
+    scan.angle_min = -lidar_fov_ / 2;
+    scan.angle_max = lidar_fov_ / 2;
+    scan.angle_increment = lidar_fov_ / (lidar_num_rays_ - 1);
+    scan.time_increment = 0;
+    scan.scan_time = 0.1;
+    scan.range_min = 0.1;
+    scan.range_max = lidar_max_range_ + 5.0;
+    bool is_collision =
+      lidar2d_sim_.simulateLidar(robotPos_, robotYaw_, scan.ranges);
+    scan_pub_.publish(scan);
     lidar_timer_.toc();
 
 
@@ -324,6 +385,11 @@ class ObstacleLidarSim {
   ros::Timer timer_;
   Timer lidar_timer_{"Lidar"};
   Timer vis_timer_{"Vis"};
+  Timer map_timer_{"Map"};
+  Logger logger_{"lidar2d_test"};
+
+  Lidar2D lidar2d_sim_{40, 40, 2 * M_PI, 512, 5.0, 0.4};
+
 
   std::vector<std::shared_ptr<Obstacle>> obstacles_;
 

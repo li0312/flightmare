@@ -8,6 +8,13 @@ project(flightlib VERSION 0.1.0)
 message(STATUS "======================  !Flightmare!  ======================")
 
 ################################################################################
+# Remove yaml-build
+################################################################################
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/externals/yaml-build)
+  file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/externals/yaml-build)
+endif()
+
+################################################################################
 # Options
 ################################################################################
 option(BUILD_TESTS "Building the tests" ON)

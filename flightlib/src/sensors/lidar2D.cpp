@@ -93,6 +93,13 @@ Scalar Rectangle::distanceToPoint(const Vector<2>& point) const {
   return (localPoint - closest).norm();
 }
 
+bool Rectangle::containsPoint(const Vector<2>& point) const {
+  Vector<2> localPoint = inv_rotation_ * (point - center_);
+
+  return (localPoint.x() >= -width_ / 2) && (localPoint.x() <= width_ / 2) &&
+         (localPoint.y() >= -height_ / 2) && (localPoint.y() <= height_ / 2);
+}
+
 Ellipse::Ellipse(Vector<2> center, Scalar a, Scalar b, Scalar angle)
   : center_(center), a_{a}, b_{b} {
   rotation_ = Eigen::Rotation2Df(angle).toRotationMatrix();
@@ -154,6 +161,14 @@ Scalar Ellipse::distanceToPoint(const Vector<2>& point) const {
     dir * a_ * b_ / sqrt(pow(b_ * dir.x(), 2) + pow(a_ * dir.y(), 2));
 
   return (localPoint - ellipsePoint).norm();
+}
+
+bool Ellipse::containsPoint(const Vector<2>& point) const {
+  Vector<2> localPoint = inv_rotation_ * (point - center_);
+
+  Scalar normalized = (localPoint.x() * localPoint.x()) / (a_ * a_) +
+                      (localPoint.y() * localPoint.y()) / (b_ * b_);
+  return normalized <= 1.0;
 }
 
 
@@ -251,84 +266,202 @@ bool AABBTree::rayIntersect(const Vector<2>& origin, const Vector<2>& dir,
 }
 
 
-ObstacleMap::ObstacleMap(Scalar width, Scalar height)
-  : mapBounds_(Vector<2>(0, 0), Vector<2>(width, height)) {}
+Lidar2D::Lidar2D(Scalar mapWidth, Scalar mapHeight, Scalar fov, int numRays,
+                 Scalar maxRange, Scalar safe_range)
+  : mapBounds_(Vector<2>(0, 0), Vector<2>(mapWidth, mapHeight)),
+    fov_(fov),
+    numRays_(numRays),
+    maxRange_(maxRange),
+    safe_range_(safe_range),
+    is_collision_(false) {}
 
-void ObstacleMap::addRectangle(Vector<2> center, Scalar width, Scalar height,
-                               Scalar angle) {
+void Lidar2D::addRectangle(Vector<2> center, Scalar width, Scalar height,
+                           Scalar angle) {
   auto rect = std::make_shared<Rectangle>(center, width, height, angle);
   obstacles_.push_back(rect);
   treeBuilt_ = false;  // 需要重建树
 }
 
-void ObstacleMap::addEllipse(Vector<2> center, Scalar a, Scalar b,
-                             Scalar angle) {
+void Lidar2D::addEllipse(Vector<2> center, Scalar a, Scalar b, Scalar angle) {
   auto ellipse = std::make_shared<Ellipse>(center, a, b, angle);
   obstacles_.push_back(ellipse);
   treeBuilt_ = false;  // 需要重建树
 }
 
-void ObstacleMap::buildTree() {
+void Lidar2D::buildTree() {
   if (!treeBuilt_) {
     aabbTree_.build(obstacles_);
+    logger_.debug("Tree build success..");
     treeBuilt_ = true;
   }
 }
 
-void ObstacleMap::generateRandomMap(int numRectangles, int numEllipses) {
+void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
+                                int MAX_ATTEMPTS) {
+  // reset
+  obstacles_.clear();
+  // treeBuilt_ = false;
+
+
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<Scalar> posX(0, mapBounds_.max().x());
-  std::uniform_real_distribution<Scalar> posY(0, mapBounds_.max().y());
-  std::uniform_real_distribution<Scalar> size(0.5, 5.0);
+  std::uniform_real_distribution<Scalar> posX(-mapBounds_.max().x() / 2,
+                                              mapBounds_.max().x() / 2);
+  std::uniform_real_distribution<Scalar> posY(-mapBounds_.max().y() / 2,
+                                              mapBounds_.max().y() / 2);
+  std::uniform_real_distribution<Scalar> size(0.3, 0.6);
   std::uniform_real_distribution<Scalar> angle(0, M_PI);
 
   // 添加随机矩形
   for (int i = 0; i < numRectangles; ++i) {
-    addRectangle({posX(gen), posY(gen)}, size(gen), size(gen), angle(gen));
+    bool is_placed = false;
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+      Scalar cx = posX(gen);
+      Scalar cy = posY(gen);
+      Scalar width = size(gen);
+      Scalar height = size(gen);
+      Scalar yaw = angle(gen);
+      auto rect =
+        std::make_shared<Rectangle>(Vector<2>{cx, cy}, width, height, yaw);
+      bool collision = false;
+      for (const auto& existing : obstacles_) {
+        if (rect->getBBox().intersects(existing->getBBox())) {
+          collision = true;
+          break;
+        }
+      }
+      if (!collision) {
+        obstacles_.push_back(rect);
+        treeBuilt_ = false;  // 需要重建树
+        is_placed = true;
+        break;
+      }
+    }
+    if (!is_placed) std::cerr << "无法放置长方体 " << i << std::endl;
   }
 
   // 添加随机椭圆
   for (int i = 0; i < numEllipses; ++i) {
-    Scalar a = size(gen);
-    Scalar b = size(gen);
-    if (b > a) std::swap(a, b);  // 确保a是长轴
-    addEllipse({posX(gen), posY(gen)}, a, b, angle(gen));
-  }
-
-  buildTree();
-}
-
-std::vector<Scalar> ObstacleMap::simulateLidar(const Vector<2>& robotPos,
-                                               Scalar robotAngle, Scalar fov,
-                                               int numRays, Scalar maxRange) {
-  buildTree();  // 确保树已构建
-
-  std::vector<Scalar> ranges(numRays, maxRange);
-  const Scalar angleStep = fov / (numRays - 1);
-  const Scalar startAngle = robotAngle - fov / 2;
-
-  // 并行处理射线
-  std::vector<std::future<void>> futures;
-  futures.reserve(numRays);
-
-  for (int i = 0; i < numRays; ++i) {
-    futures.push_back(std::async(std::launch::async, [&, i] {
-      Scalar rayAngle = startAngle + i * angleStep;
-      Vector<2> dir(std::cos(rayAngle), std::sin(rayAngle));
-
-      Scalar t = maxRange;
-      if (aabbTree_.rayIntersect(robotPos, dir, maxRange, t)) {
-        ranges[i] = t;
+    bool is_placed = false;
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+      Scalar cx = posX(gen);
+      Scalar cy = posY(gen);
+      Scalar a = size(gen);
+      Scalar b = size(gen);
+      if (b > a) std::swap(a, b);  // 确保a是长轴
+      Scalar yaw = angle(gen);
+      auto ellipse = std::make_shared<Ellipse>(Vector<2>{cx, cy}, a, b, yaw);
+      bool collision = false;
+      for (const auto& existing : obstacles_) {
+        if (ellipse->getBBox().intersects(existing->getBBox())) {
+          collision = true;
+          break;
+        }
       }
-    }));
+      if (!collision) {
+        obstacles_.push_back(ellipse);
+        treeBuilt_ = false;  // 需要重建树
+        is_placed = true;
+        break;
+      }
+    }
+    if (!is_placed) std::cerr << "无法放置圆柱体 " << i << std::endl;
   }
 
-  // 等待所有射线完成
-  for (auto& f : futures) f.wait();
-
-  return ranges;
+  // buildTree();
 }
+
+bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
+                            std::vector<Scalar>& ranges, bool is_norm) {
+  // buildTree();  // 确保树已构建
+
+  ranges.assign(numRays_, maxRange_);
+  const Scalar angleStep = fov_ / (numRays_ - 1);
+  const Scalar startAngle = robotAngle - fov_ / 2;
+
+  Scalar min_scan = maxRange_;
+  bool in_obstacles = false;
+  bool is_collision = false;
+
+  // =========== Method 1 =================//
+  // FIXME - has bug.
+  // for (int i = 0; i < numRays_; ++i) {
+  //   Scalar angle = startAngle + i * angleStep;
+  //   Vector<2> dir(std::cos(angle), std::sin(angle));
+
+  //   Scalar t = maxRange_;
+  //   if (aabbTree_.rayIntersect(robotPos, dir, maxRange_, t)) {
+  //     ranges[i] = t;
+  //   }
+  //   ranges[i] = t;
+  // }
+
+  // =========== Method 2 =================//
+  for (int i = 0; i < numRays_; ++i) {
+    Scalar angle = startAngle + i * angleStep;
+    Vector<2> dir(std::cos(angle), std::sin(angle));
+
+    for (const auto& obs : obstacles_) {
+      Scalar t_obs;
+      if (obs->rayIntersect(robotPos, dir, maxRange_, t_obs)) {
+        if (t_obs < ranges[i]) ranges[i] = t_obs;
+      }
+      if (!in_obstacles && obs->containsPoint(robotPos)) {
+        in_obstacles = true;
+      }
+    }
+    if (ranges[i] < min_scan) min_scan = ranges[i];
+  }
+  if (is_norm) {
+    for (int i = 0; i < numRays_; ++i) {
+      ranges[i] = ranges[i] / maxRange_ - 0.5f;
+    }
+  }
+
+  if ((min_scan < safe_range_) || in_obstacles) {
+    is_collision = true;
+    logger_.warn("ENVIRONMENT COLLISION DETECTED!!");
+    logger_.debug("close: %.2f;  in: %d", min_scan, in_obstacles);
+  }
+  is_collision_ = is_collision;
+  return is_collision;
+
+  // =========== Method 3 =================//
+  // // 并行处理射线
+  // std::vector<std::future<void>> futures;
+  // futures.reserve(numRays_);
+  // for (int i = 0; i < numRays_; ++i) {
+  //   futures.push_back(std::async(std::launch::async, [&, i] {
+  //     Scalar rayAngle = startAngle + i * angleStep;
+  //     Vector<2> dir(std::cos(rayAngle), std::sin(rayAngle));
+
+  //     Scalar t = maxRange_;
+  //     if (aabbTree_.rayIntersect(robotPos, dir, maxRange_, t)) {
+  //       ranges[i] = t;
+  //     }
+  //   }));
+  // }
+  // // 等待所有射线完成
+  // for (auto& f : futures) f.wait();
+}
+
+bool Lidar2D::simulateLidar(const QuadState& state, std::vector<Scalar>& ranges,
+                            bool is_norm) {
+  Vector<2> robot_pose{state.p.x(), state.p.y()};
+  Vector<3> euler_xyz = state.euler_xyz();
+  Scalar robot_yaw = euler_xyz.z();
+  return simulateLidar(robot_pose, robot_yaw, ranges, is_norm);
+}
+
+const std::vector<std::shared_ptr<Obstacle>>& Lidar2D::getObstacles() const {
+  return obstacles_;
+}
+
+std::vector<std::shared_ptr<Obstacle>>& Lidar2D::getObstacles() {
+  return obstacles_;
+}
+
+bool Lidar2D::isCollision() { return is_collision_; }
 
 
 }  // namespace flightlib

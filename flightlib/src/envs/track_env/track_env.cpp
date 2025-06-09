@@ -1,17 +1,17 @@
-/*** 
+/***
  * @Author: Lac_Creeper
  * @Date: 2025-05-23 15:11:53 +0800
- * @LastEditTime: 2025-06-03 16:56:25 +0800
+ * @LastEditTime: 2025-06-09 15:48:29 +0800
  * @LastEditors: Lac_Creeper
- * @Description: 
+ * @Description:
  * @FilePath: /flightmare/flightlib/src/envs/track_env/track_env.cpp
  */
 #include "flightlib/envs/track_env/track_env.hpp"
 
 namespace flightlib {
 
-TrackEnv::TrackEnv() 
-  : TrackEnv(getenv("FLIGHTMARE_PATH") + 
+TrackEnv::TrackEnv()
+  : TrackEnv(getenv("FLIGHTMARE_PATH") +
              std::string("/flightlib/configs/track_env.yaml")) {}
 
 TrackEnv::TrackEnv(const std::string &cfg_path)
@@ -40,7 +40,7 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
   act_dim_ = trackenv::kNAct;
 
   act_std_ = Vector<trackenv::kNAct>::Ones() * 1.0f;
-
+  // detect settings
   desired_dist_ = 6.0f;
   desired_bbox_ = {449, 158, 510, 362};
 
@@ -61,8 +61,9 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
   if (random) {
     bool has_collision = true;
     bool has_visual = false;
-    while (has_collision || (!has_visual))
-    {
+    lidar_.generateRandomMap(50, 50);
+
+    while (has_collision || (!has_visual)) {
       // randomly reset the quadrotor state
       Scalar init_x = uniform_dist_(random_gen_) * 10.0f;
       Scalar init_y = uniform_dist_(random_gen_) * 10.0f;
@@ -72,24 +73,25 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
       quad_state_.x(QS::POSY) = init_y;
       quad_state_.x(QS::POSZ) = 0.8f;
       Scalar yaw = uniform_dist_(random_gen_) * M_PI;
-      quad_state_.x(QS::ATTW) = std::cos(yaw/2.0);
+      quad_state_.x(QS::ATTW) = std::cos(yaw / 2.0);
       quad_state_.x(QS::ATTX) = 0.0f;
       quad_state_.x(QS::ATTY) = 0.0f;
-      quad_state_.x(QS::ATTZ) = std::sin(yaw/2.0);
+      quad_state_.x(QS::ATTZ) = std::sin(yaw / 2.0);
       quad_state_.qx /= quad_state_.qx.norm();
       // reset the target
       target_xyY_.x() = init_x + tag_x * std::cos(yaw) - tag_y * std::sin(yaw);
       target_xyY_.y() = init_y + tag_x * std::sin(yaw) + tag_y * std::cos(yaw);
       target_xyY_.z() = uniform_dist_(random_gen_) * M_PI;
       // check collision
-      lidar_.renderPointCloud(quad_state_);
-      has_collision = lidar_.isCollision();
+      std::vector<Scalar> temp_scan;
+      has_collision = lidar_.simulateLidar(quad_state_, temp_scan, true);
+      // lidar_.renderPointCloud(quad_state_);
+      // has_collision = lidar_.isCollision();
       // check target in FOV
       detect_.updateTarget(target_xyY_);
       detect_.getBBox(quad_state_, detect_bbox_);
       has_visual = detect_bbox_.is_valid();
     }
-    
   }
   quadrotor_ptr_->reset(quad_state_);
 
@@ -108,10 +110,13 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
   // logger_.debug("getObs start..");
 
   quadrotor_ptr_->getState(&quad_state_);
-  lidar_.renderLaserScan(quad_state_, true);
-  const auto &scan_data = lidar_.getScan();
-  Vector<trackenv::kNLaser1> scan = 
-          Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
+  // lidar_.renderLaserScan(quad_state_, true);
+  // const auto &scan_data = lidar_.getScan();
+  std::vector<Scalar> scan_data;
+  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, true);
+
+  Vector<trackenv::kNLaser1> scan =
+    Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
 
   detect_.getBBox(quad_state_, detect_bbox_);
 
@@ -119,20 +124,20 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
     track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) = scan;
     track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) = scan;
     track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
-    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) = 
+    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
       detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) = 
+    track_obs_.segment<trackenv::kNState>(trackenv::kState) =
       Vector<3>{0.0f, 0.0f, 0.0f};
     has_init_obs_ = true;
   } else {
-    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) = 
+    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) =
       track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2);
     track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) =
       track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3);
     track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
     track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
       detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) = 
+    track_obs_.segment<trackenv::kNState>(trackenv::kState) =
       track_act_.cwiseQuotient(act_std_);
   }
 
@@ -162,27 +167,28 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   Scalar detect_reward = detect_coeff_ * detect_bbox_.IoU(desired_bbox_);
 
   // - position term
-  Scalar pos_reward = 
-    pos_coeff_ * ((quad_state_.x.segment<2>(QS::POS) - 
-                  target_xyY_.segment<2>(0)).squaredNorm() - desired_dist_);
-  
+  Scalar pos_reward =
+    pos_coeff_ *
+    ((quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0))
+       .squaredNorm() -
+     desired_dist_);
+
   // - theta term
   /// TODO: add direction vector reward
-  Scalar theta_reward = 
-    theta_coeff_ * 0.0f;
+  Scalar theta_reward = theta_coeff_ * 0.0f;
 
   // - control action penalty
   Scalar act_reward = act_coeff_ * act.cast<Scalar>().norm();
 
   // - reach reward
   Scalar reach_reward = 0.0;
-  if ((std::abs(track_obs_[trackenv::kDetect]) < 30.0/960.0) && 
-      (std::abs(track_obs_[trackenv::kDetect+1]) < 30.0/540.0) && 
-      (std::abs(track_obs_[trackenv::kDetect+2]) < 30.0/540.0)) {
+  if ((std::abs(track_obs_[trackenv::kDetect]) < 30.0 / 960.0) &&
+      (std::abs(track_obs_[trackenv::kDetect + 1]) < 30.0 / 540.0) &&
+      (std::abs(track_obs_[trackenv::kDetect + 2]) < 30.0 / 540.0)) {
     reach_reward = 0.2;
   }
 
-  Scalar total_reward = 
+  Scalar total_reward =
     detect_reward + pos_reward + theta_reward + act_reward + reach_reward;
 
   // survival reward
@@ -194,7 +200,7 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 }
 
 bool TrackEnv::isTerminalState(Scalar &reward) {
-  if (!detect_bbox_.is_valid()){
+  if (!detect_bbox_.is_valid()) {
     reward = -40;
     logger_.debug("target loss..");
     return true;
@@ -265,4 +271,4 @@ std::ostream &operator<<(std::ostream &os, const TrackEnv &track_env) {
 }
 
 
-} // namespace flightlib
+}  // namespace flightlib

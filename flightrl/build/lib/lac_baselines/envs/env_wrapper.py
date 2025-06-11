@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-05-25 15:18:40 +0800
-LastEditTime: 2025-05-27 13:55:15 +0800
+LastEditTime: 2025-06-10 16:49:56 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_baselines/envs/env_wrapper.py
@@ -21,14 +21,14 @@ class EnvWrapper(gym.Env):
 		self._observation_space = gym.spaces.Box(
 			np.ones(self.num_obs) * -np.Inf,
 			np.ones(self.num_obs) * np.Inf, 
-			dtype=np.float32)
+			dtype=np.float64)
 		# the actions are eventually constrained by the action space
 		self._action_space = gym.spaces.Box(
 			low=np.ones(self.num_act) * -1., 
 			high=np.ones(self.num_act) * 1., 
-			dtype=np.float32)
+			dtype=np.float64)
 		self.observation = np.zeros(self.num_obs, 
-			dtype=np.float32)
+			dtype=np.float64)
 		self.reward = np.float32(0.0)
 		self.done = False
 

@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-05-25 21:33:19 +0800
-LastEditTime: 2025-05-31 10:41:58 +0800
+LastEditTime: 2025-06-10 23:24:48 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_demos/track_target.py
@@ -22,7 +22,13 @@ from lac_baselines.common.track_net import TrackCNN
 from lac_baselines.envs import vec_env_wrapper as wrapper
 import lac_baselines.common.util as U
 
+import rospy
+rospy.init_node("track_env_py", anonymous=True)
+print(rospy.Time.now().to_sec())
+
 from flightgym import TrackEnv_v1
+
+
 
 def configure_random_seed(seed, env=None):
   if env is not None:
@@ -86,18 +92,18 @@ def main():
       gae_lambda=0.95,
       gamma=0.99,  # lower 0.9 ~ 0.99
       # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
-      n_steps=250,
+      n_steps=300,
       ent_coef=0.00,
       learning_rate=3e-4,
       vf_coef=0.5,
       max_grad_norm=0.5,
-      batch_size=250,
+      batch_size=300,
       n_epochs=10,
       clip_range=0.2,
       verbose=1,
     )
     # model = PPO.load(log_dir + "/model_11460000_steps")
-    model.set_parameters(log_dir + "/model_11460000_steps")
+    # model.set_parameters(log_dir + "/model_11460000_steps")
     
 
     # tensorboard
@@ -111,14 +117,14 @@ def main():
     # 2000000000 is 4000 iterations.
 
     checkpoint_callback = CheckpointCallback(
-      save_freq=10000,
+      save_freq=1000000,
       save_path=log_dir + "/checkpoints/",
       name_prefix="model"
     )
 
     logger.configure(folder=saver.data_dir)
     model.learn(
-        total_timesteps=int(25000000),
+        total_timesteps=int(250000000),
         callback=checkpoint_callback,
         tb_log_name=saver.data_dir + "/ppo_run",
         reset_num_timesteps=False)

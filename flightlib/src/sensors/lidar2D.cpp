@@ -420,8 +420,8 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
 
   if ((min_scan < safe_range_) || in_obstacles) {
     is_collision = true;
-    logger_.warn("ENVIRONMENT COLLISION DETECTED!!");
-    logger_.debug("close: %.2f;  in: %d", min_scan, in_obstacles);
+    // logger_.warn("ENVIRONMENT COLLISION DETECTED!!");
+    // logger_.debug("close: %.2f;  in: %d", min_scan, in_obstacles);
   }
   is_collision_ = is_collision;
   return is_collision;

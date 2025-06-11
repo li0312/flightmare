@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 13:06:03 +0800
- * @LastEditTime: 2025-06-03 16:49:18 +0800
+ * @LastEditTime: 2025-06-11 14:52:24 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightros/src/lac_test/vel_control_test.cpp
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     // dt = 0.05;
     cmd.t += dt;
     // cmd.linear.x() = 2.0;
-    // cmd.angular.z() = 0.6;
+    cmd.angular.z() = 0.02;
     // if (cmd.t < 15) {
     //   cmd.linear.x() = 2.0;
     //   cmd.angular.z() = 0.5;
@@ -216,9 +216,6 @@ int main(int argc, char *argv[]) {
     // cmd.linear.x() = 2.0;
     // cmd.angular.z() = 0.5;
     // timer.tic();
-
-
-    
 
 
     quad_ptr->velocityControlBody(cmd, dt);
@@ -290,6 +287,7 @@ int main(int argc, char *argv[]) {
     unity_bridge_ptr->handleOutput();
 
     std::cout << timer << std::endl;
+    std::cout << Vector<2>::Zero() << std::endl;
 
     // cv::Mat img;
 

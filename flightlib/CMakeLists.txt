@@ -56,6 +56,17 @@ message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
 include(cmake/pybind11.cmake)
 include(cmake/yaml.cmake)
 
+# Including dependencies ROS
+# find_package(catkin REQUIRED COMPONENTS 
+#   roscpp 
+# #   # std_msgs
+#   tf_conversions
+#   tf
+#   sensor_msgs
+#   visualization_msgs
+#   nav_msgs
+# )
+
 # Including dependencies PCL
 find_package(PCL 1.10 REQUIRED)
 add_definitions(${PCL_DEFINITIONS})
@@ -103,6 +114,13 @@ add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1048576)
 include_directories(${EIGEN_INCLUDE_DIR} "tests")
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
+include_directories(
+#   # /opt/ros/noetic/include
+  /opt/ros/noetic/include;/opt/ros/noetic/share/xmlrpcpp/cmake/../../../include/xmlrpcpp;/usr/include
+#   ${catkin_INCLUDE_DIRS}
+)
+
+message("catkin_INCLUDE_DIRS>>>>>>>>>${catkin_LIBRARIES}")
 
 # Set default build type
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
@@ -222,6 +240,7 @@ else()
   target_link_libraries(${PROJECT_NAME} PRIVATE
     ${OpenCV_LIBRARIES}
     ${PCL_LIBRARIES}
+    /opt/ros/noetic/lib/libtf_conversions.so;/opt/ros/noetic/lib/libkdl_conversions.so;/usr/lib/liborocos-kdl.so;/opt/ros/noetic/lib/libtf.so;/opt/ros/noetic/lib/libtf2_ros.so;/opt/ros/noetic/lib/libactionlib.so;/opt/ros/noetic/lib/libmessage_filters.so;/opt/ros/noetic/lib/libroscpp.so;/usr/lib/x86_64-linux-gnu/libpthread.so;/usr/lib/x86_64-linux-gnu/libboost_chrono.so.1.71.0;/usr/lib/x86_64-linux-gnu/libboost_filesystem.so.1.71.0;/opt/ros/noetic/lib/libxmlrpcpp.so;/opt/ros/noetic/lib/libtf2.so;/opt/ros/noetic/lib/librosconsole.so;/opt/ros/noetic/lib/librosconsole_log4cxx.so;/opt/ros/noetic/lib/librosconsole_backend_interface.so;/usr/lib/x86_64-linux-gnu/liblog4cxx.so;/usr/lib/x86_64-linux-gnu/libboost_regex.so.1.71.0;/opt/ros/noetic/lib/libroscpp_serialization.so;/opt/ros/noetic/lib/librostime.so;/usr/lib/x86_64-linux-gnu/libboost_date_time.so.1.71.0;/opt/ros/noetic/lib/libcpp_common.so;/usr/lib/x86_64-linux-gnu/libboost_system.so.1.71.0;/usr/lib/x86_64-linux-gnu/libboost_thread.so.1.71.0;/usr/lib/x86_64-linux-gnu/libconsole_bridge.so.0.4
     yaml-cpp
     zmq
     zmqpp

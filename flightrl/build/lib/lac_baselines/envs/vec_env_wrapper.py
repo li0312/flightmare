@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-05-25 20:46:18 +0800
-LastEditTime: 2025-05-29 16:31:06 +0800
+LastEditTime: 2025-06-11 14:36:23 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_baselines/envs/vec_env_wrapper.py
@@ -14,7 +14,7 @@ from stable_baselines3.common.vec_env import VecEnv
 class TrackEnvVec(VecEnv):
 	#
 	def __init__(self, impl):
-		# print("[VecEnv]: init test 1 ..")
+		print("[VecEnv]: init test 1 ..")
 		self.wrapper = impl
 		self.num_obs = self.wrapper.getObsDim()
 		self.num_acts = self.wrapper.getActDim()

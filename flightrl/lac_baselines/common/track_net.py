@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-05-27 12:03:16 +0800
-LastEditTime: 2025-05-29 16:29:37 +0800
+LastEditTime: 2025-06-11 14:36:03 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_baselines/common/track_net.py
@@ -18,16 +18,16 @@ class TrackCNN(BaseFeaturesExtractor):
 
     self.net = nn.Sequential(
       nn.Conv1d(in_channels=3, out_channels=32, kernel_size=5, stride=2, padding=1),
-      nn.ReLU(),
+      nn.Tanh(),
       nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1),
-      nn.ReLU(),
+      nn.Tanh(),
       nn.Flatten(),
       nn.Linear(128*32, 256),
-      nn.ReLU())
+      nn.Tanh())
     
     self.fc = nn.Sequential(
       nn.Linear(in_features=256+3+3, out_features=features_dim),
-      nn.ReLU())
+      nn.Tanh())
     
   def forward(self, obs):
     obs_lidar = obs['lidar']

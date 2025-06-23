@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 13:06:03 +0800
- * @LastEditTime: 2025-06-11 14:52:24 +0800
+ * @LastEditTime: 2025-06-16 19:49:08 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightros/src/lac_test/vel_control_test.cpp
@@ -124,6 +124,8 @@ int main(int argc, char *argv[]) {
   // initialization
   quad_state.setZero();
 
+  quad_state.x(QS::POSX) = 5;
+  quad_state.x(QS::POSY) = 5;
   quad_state.x(QS::POSZ) = 0.8;
   // quad_state.x(QS::ATTW) = std::cos(5.0/180*M_PI);
   // quad_state.x(QS::ATTX) = 0.0;
@@ -184,20 +186,47 @@ int main(int argc, char *argv[]) {
 
   Timer timer("Detect", "Printing");
   Timer timer_1("Lidar", "Printing");
+  std::random_device rd_;
+  std::mt19937 random_gen_{rd_()};
+  std::uniform_real_distribution<Scalar> uniform_dist_{-1.0, 1.0};
+  int step = 0;
+  int epoch = 100;
+
 
   while (ros::ok() && unity_ready) {
     // quad_state.x[QS::POSZ] += 0.1;
 
     // quad_ptr->setState(quad_state);
     // Control by velocity control
+    step += 1;
+    int mod = (step % epoch);
+    if (mod == 0) {
+      quad_state.setZero();
+      Scalar init_x = uniform_dist_(random_gen_) * 5.0f;
+      Scalar init_y = uniform_dist_(random_gen_) * 5.0f;
+      quad_state.x(QS::POSX) = init_x;
+      quad_state.x(QS::POSY) = init_y;
+      quad_state.x(QS::POSZ) = 0.8f;
+      Scalar yaw = uniform_dist_(random_gen_) * M_PI;
+      quad_state.x(QS::ATTW) = std::cos(yaw / 2.0);
+      quad_state.x(QS::ATTX) = 0.0f;
+      quad_state.x(QS::ATTY) = 0.0f;
+      quad_state.x(QS::ATTZ) = std::sin(yaw / 2.0);
+      quad_state.qx /= quad_state.qx.norm();
+      quad_ptr->reset(quad_state);
+
+      cmd.t = 0;
+      cmd.linear.setZero();
+      cmd.angular.setZero();
+    }
     
     time_last = time_now;
     time_now = ros::Time::now();
     Scalar dt = (time_now - time_last).toSec();
-    // dt = 0.05;
+    dt = 0.05;
     cmd.t += dt;
-    // cmd.linear.x() = 2.0;
-    cmd.angular.z() = 0.02;
+    cmd.linear.x() = uniform_dist_(random_gen_);
+    cmd.angular.z() = uniform_dist_(random_gen_);
     // if (cmd.t < 15) {
     //   cmd.linear.x() = 2.0;
     //   cmd.angular.z() = 0.5;
@@ -224,16 +253,17 @@ int main(int argc, char *argv[]) {
     // DEBUG:
 
     quad_ptr->getState(&state4test);
+    logger.info("time: %.2f", state4test.t);
 
     timer.tic();
     BBox result_bbox;
     Vector<3> target_xyY = {6.0, 0.0, 0.0};
     detect_test.updateTarget(target_xyY);
     bool is_valid = detect_test.getBBox(state4test, result_bbox);
-    std::cout << result_bbox << std::endl;
-    logger.debug("is_valid: %d", is_valid);
-    logger.debug("bbox: %d, %d, %d, %d", result_bbox.u_min, result_bbox.u_max,
-                 result_bbox.v_min, result_bbox.v_max);
+    // std::cout << result_bbox << std::endl;
+    // logger.debug("is_valid: %d", is_valid);
+    // logger.debug("bbox: %d, %d, %d, %d", result_bbox.u_min, result_bbox.u_max,
+    //              result_bbox.v_min, result_bbox.v_max);
 
     timer.toc();
 
@@ -286,8 +316,8 @@ int main(int argc, char *argv[]) {
     unity_bridge_ptr->getRender(frame_id);
     unity_bridge_ptr->handleOutput();
 
-    std::cout << timer << std::endl;
-    std::cout << Vector<2>::Zero() << std::endl;
+    // std::cout << timer << std::endl;
+    // std::cout << Vector<2>::Zero() << std::endl;
 
     // cv::Mat img;
 

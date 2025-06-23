@@ -219,5 +219,6 @@ std::ostream& operator<<(std::ostream& os, const VecEnv<EnvBase>& env) {
 // Segmentation fault (core dumped)
 template class VecEnv<QuadrotorEnv>;
 template class VecEnv<TrackEnv>;
+template class VecEnv<ObstacleEnv>;
 
 }  // namespace flightlib

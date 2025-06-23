@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 12:56:14 +0800
- * @LastEditTime: 2025-05-15 12:56:15 +0800
+ * @LastEditTime: 2025-06-16 19:47:36 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /src/flightmare/flightlib/include/flightlib/common/trajectory_point.hpp
+ * @FilePath: /flightmare/flightlib/include/flightlib/common/trajectory_point.hpp
  */
 # pragma once
 

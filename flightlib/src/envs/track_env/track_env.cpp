@@ -19,20 +19,23 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
     detect_coeff_{0.0f},
     pos_coeff_{0.0f},
     theta_coeff_{0.0f},
-    act_coeff_{0.0f} {
+    act_coeff_{0.0f},
+    use_ros_{0} {
   // load configuration file
   YAML::Node cfg_ = YAML::LoadFile(cfg_path);
 
-  int argc = 0;
-  char **argv = NULL;
-  ros::init(argc, argv, "track_env_cpp");
+  if (use_ros_) {
+    int argc = 0;
+    char **argv = NULL;
+    ros::init(argc, argv, "track_env_cpp");
 
-  nh_ = std::make_unique<ros::NodeHandle>();
+    nh_ = std::make_unique<ros::NodeHandle>();
 
-  map_pub_ = nh_->advertise<visualization_msgs::MarkerArray>("/obstacles", 1);
-  scan_pub_ = nh_->advertise<sensor_msgs::LaserScan>("/scan", 1);
-  odom_pub_ = nh_->advertise<nav_msgs::Odometry>("/odom", 1);
-  target_pub_ = nh_->advertise<visualization_msgs::Marker>("/target", 1);
+    map_pub_ = nh_->advertise<visualization_msgs::MarkerArray>("/obstacles", 1);
+    scan_pub_ = nh_->advertise<sensor_msgs::LaserScan>("/scan", 1);
+    odom_pub_ = nh_->advertise<nav_msgs::Odometry>("/odom", 1);
+    target_pub_ = nh_->advertise<visualization_msgs::Marker>("/target", 1);
+  }
 
   quadrotor_ptr_ = std::make_shared<Quadrotor>();
   // update dynamics
@@ -64,15 +67,16 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
   // load parameters
   loadParam(cfg_);
 
-  std::vector<std::shared_ptr<Obstacle>> obstacles;
-  obstacles = lidar_.getObstacles();
-  for (int i = 0; i < 20; ++i) {
-    visualizeObstacles(obstacles);
-    ros::Rate loop_rate(10);
-    loop_rate.sleep();
+  if (use_ros_) {
+    std::vector<std::shared_ptr<Obstacle>> obstacles;
+    obstacles = lidar_.getObstacles();
+    for (int i = 0; i < 20; ++i) {
+      visualizeObstacles(obstacles);
+      ros::Rate loop_rate(10);
+      loop_rate.sleep();
+    }
   }
-
-
+  
   logger_.debug("Init success..");
 }
 
@@ -82,36 +86,6 @@ TrackEnv::~TrackEnv() {}
 void TrackEnv::visualizeObstacles(std::vector<std::shared_ptr<Obstacle>>& obstacles) {
   visualization_msgs::MarkerArray markers;
   int id = 0;
-  // Scalar angle_min = -lidar_fov_ / 2;
-  // Scalar angle_increment = lidar_fov_ / (lidar_num_rays_ - 1);
-  // visualization_msgs::Marker lidar_lines;
-  // lidar_lines.header.frame_id = "map";
-  // lidar_lines.header.stamp = ros::Time::now();
-  // lidar_lines.ns = "lidar_lines";
-  // lidar_lines.id = id++;
-  // lidar_lines.action = visualization_msgs::Marker::ADD;
-  // lidar_lines.type = visualization_msgs::Marker::LINE_LIST;
-  // lidar_lines.pose.orientation.w = 1.0;
-  // lidar_lines.scale.x = 0.02;
-  // lidar_lines.scale.y = 0.02;
-  // lidar_lines.scale.z = 0.02;
-  // lidar_lines.color.a = 0.8;
-  // lidar_lines.color.r = 0.0;
-  // lidar_lines.color.g = 0.0;
-  // lidar_lines.color.b = 0.0;
-  // for (int i = 0; i < lidar_num_rays_; ++i) {
-  //   Scalar angle = robotYaw_ + angle_min + i * angle_increment;
-  //   geometry_msgs::Point p_msg;
-  //   p_msg.x = robotPos_.x();
-  //   p_msg.y = robotPos_.y();
-  //   p_msg.z = 0.0;
-  //   lidar_lines.points.push_back(p_msg);
-  //   p_msg.x = robotPos_.x() + lidar_max_range_ * cos(angle);
-  //   p_msg.y = robotPos_.y() + lidar_max_range_ * sin(angle);
-  //   p_msg.z = 0.0;
-  //   lidar_lines.points.push_back(p_msg);
-  // }
-  // markers.markers.push_back(lidar_lines);
 
   for (const auto &obs : obstacles) {
     visualization_msgs::Marker marker;
@@ -195,7 +169,7 @@ void TrackEnv::visualizeScan() {
   scan.time_increment = 0;
   scan.scan_time = 0.1;
   scan.range_min = 0.1;
-  scan.range_max = 5.0 + 0.5;
+  scan.range_max = 6.0;
   bool is_collision =
     lidar_.simulateLidar(quad_state_, scan.ranges, false);
   scan_pub_.publish(scan);
@@ -240,9 +214,17 @@ void TrackEnv::visualizeTarget() {
 }
 
 
-bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
-  // logger_.debug("reset start..");
+Vector<3> TrackEnv::convVel() {
+  Scalar yaw = quad_state_.euler_xyz().z();
+  Vector<3> localVel;
+  localVel.x() = cos(yaw) * quad_state_.v.x() + sin(yaw) * quad_state_.v.y();
+  localVel.y() = -sin(yaw) * quad_state_.v.x() + cos(yaw) * quad_state_.v.y();
+  // logger_.info("local_v: [%.2f, %.2f]", localVel.x(), local_vy);
+  localVel.z() = quad_state_.x(QS::OMEZ);
+  return localVel;
+}
 
+bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
   step_num_ = 0;
   reach_count_ = 0;
   quad_state_.setZero();
@@ -256,10 +238,10 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
       // randomly reset the quadrotor state
       Scalar init_x = uniform_dist_(random_gen_) * 10.0f;
       Scalar init_y = uniform_dist_(random_gen_) * 10.0f;
-      // Scalar tag_x = uniform_dist_(random_gen_) * 2.0f + desired_dist_;
-      Scalar tag_x = desired_dist_;
-      // Scalar tag_y = uniform_dist_(random_gen_) * 1.0f;
-      Scalar tag_y = 0.0f;
+      Scalar tag_x = uniform_dist_(random_gen_) * 2.5f + desired_dist_;
+      Scalar tag_y = uniform_dist_(random_gen_) * 1.5f;
+      // Scalar tag_x = desired_dist_;
+      // Scalar tag_y = 0.0f;
       quad_state_.x(QS::POSX) = init_x;
       quad_state_.x(QS::POSY) = init_y;
       quad_state_.x(QS::POSZ) = 0.8f;
@@ -294,7 +276,9 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
   // obtain observations
   has_init_obs_ = false;
   has_init_reward_ = false;
-  visualizeTarget();
+  if (use_ros_) {
+    visualizeTarget();
+  }
   getObs(obs);
   // logger_.debug("reset success..");
   return true;
@@ -332,24 +316,23 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
     track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
       detect_bbox_.obs();
     track_obs_.segment<trackenv::kNState>(trackenv::kState) =
-      track_act_.cwiseQuotient(act_std_);
+      convVel();
   }
 
   obs.segment<trackenv::kNObs>(trackenv::kObs) = track_obs_;
 
   // -DEBUG: 
-  visualizeScan();
-  visualizeOdom();
-  ros::Rate loop_rate(100);
-  loop_rate.sleep();
+  if (use_ros_) {
+    visualizeScan();
+    visualizeOdom();
+    ros::Rate loop_rate(100);
+    loop_rate.sleep();
+  }
 
-
-  // logger_.debug("getObs success..");
   return true;
 }
 
 Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
-  // logger_.debug("step start..");
   step_num_ += 1;
 
   track_act_ = act.cwiseProduct(act_std_);
@@ -360,6 +343,12 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   // simulate quadrotor
   quadrotor_ptr_->velocityControlBody(cmd_, sim_dt_);
+
+
+  target_xyY_.x() += 0.5 * sim_dt_;
+  target_xyY_.y() += 0.2 * sim_dt_;
+  detect_.updateTarget(target_xyY_);
+  visualizeTarget();
 
   // update observations
   getObs(obs);
@@ -393,7 +382,7 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
     abs((quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0)).norm() - desired_dist_);
 
   Scalar pos_reward = (last_dist_ - dist) * 2.5 + 
-                      (alpha - last_alpha_) * 2.5;
+                      (alpha - last_alpha_) * 0.5;
   last_alpha_ = alpha;
   last_dist_ = dist;
 
@@ -436,29 +425,29 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
 bool TrackEnv::isTerminalState(Scalar &reward) {
   if (!detect_bbox_.is_valid()) {
-    reward = -40;
-    logger_.debug("target loss..%d", step_num_);
+    reward = -20;
+    logger_.warn("target loss..%d", step_num_);
     return true;
   }
   if (lidar_.isCollision()) {
-    reward = -50;
-    logger_.debug("drone collision..%.d", step_num_);
+    reward = -25;
+    logger_.warn("drone collision..%.d", step_num_);
     return true;
   }
   if (step_num_ >= 300) {
     if (reach_count_ > 10) {
-      reward = 40;
+      reward = 20;
+      logger_.debug("time out..%d", reach_count_);
+
     } else {
       reward = 10;
+      logger_.warn("time out..%d", reach_count_);
     }
-    logger_.debug("time out..%d", reach_count_);
     return true;
   }
-  if ((abs(quad_state_.v.x()) > 1.5) || (abs(quad_state_.v.y()) > 1.5)) {
-    reward = -25.0f;
-    logger_.debug("control error..%d", step_num_);
-    return true;
-    }
+  if ((abs(quad_state_.v.x()) > 2.0) || (abs(quad_state_.v.y()) > 2.0)) {
+    logger_.fatal("control error..%d", step_num_);
+  }
   reward = 0.0f;
   return false;
 }
@@ -467,6 +456,7 @@ bool TrackEnv::loadParam(const YAML::Node &cfg) {
   if (cfg["track_env"]) {
     sim_dt_ = cfg["track_env"]["sim_dt"].as<Scalar>();
     max_t_ = cfg["track_env"]["max_t"].as<Scalar>();
+    use_ros_ = cfg["track_env"]["use_ros"].as<int>();
   } else {
     return false;
   }

@@ -104,7 +104,7 @@ class Quadrotor : ObjectBase {
   PositionController base_controller_;
   PositionControllerParams base_controller_params_;
   TrajectoryPoint reference_state_;
-  Trajectory reference_trajectory_;
+  // Trajectory reference_trajectory_;
   // velocity control parameters and constants
   Scalar tau_velocity_command_ = 0.8;
   Scalar time_last_velocity_command_handled_ = -1;

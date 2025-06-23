@@ -84,8 +84,8 @@ bool Quadrotor::velocityControl(const Command &cmd, const Scalar ctl_dt) {
   reference_state_.heading_rate = cmd.angular(2);
   time_last_velocity_command_handled_ = cmd.t;
 
-  reference_trajectory_ = Trajectory(reference_state_);
-  Command command = base_controller_.run(state_, reference_trajectory_,
+  Trajectory reference_trajectory = Trajectory(reference_state_);
+  Command command = base_controller_.run(state_, reference_trajectory,
                                          base_controller_params_);
 
   command.t = cmd.t;
@@ -163,6 +163,7 @@ bool Quadrotor::reset(const QuadState &state) {
   state_ = state;
   motor_omega_.setZero();
   motor_thrusts_.setZero();
+  time_last_velocity_command_handled_ = -1;
   reference_state_ = TrajectoryPoint();
   reference_state_.position = state.p;
   // Vector<3> euler_zyx = state.q().toRotationMatrix().eulerAngles(2, 1, 0);

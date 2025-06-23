@@ -1,11 +1,10 @@
-/***
+/*** 
  * @Author: Lac_Creeper
- * @Date: 2025-05-21 20:25:57 +0800
- * @LastEditTime: 2025-06-09 15:42:41 +0800
+ * @Date: 2025-06-16 12:28:39 +0800
+ * @LastEditTime: 2025-06-20 21:08:17 +0800
  * @LastEditors: Lac_Creeper
- * @Description:
- * @FilePath:
- * /flightmare/flightlib/include/flightlib/envs/track_env/track_env.hpp
+ * @Description: 
+ * @FilePath: /flightmare/flightlib/include/flightlib/envs/obstacle_env/obstacle_env.hpp
  */
 #pragma once
 
@@ -25,13 +24,11 @@
 #include "flightlib/common/quad_state.hpp"
 #include "flightlib/envs/env_base.hpp"
 #include "flightlib/objects/quadrotor.hpp"
-#include "flightlib/sensors/detect.hpp"
-#include "flightlib/sensors/lidar.hpp"
 #include "flightlib/sensors/lidar2D.hpp"
 
 namespace flightlib {
 
-namespace trackenv {
+namespace obstenv {
 
 enum Ctl : int {
   // observations
@@ -44,25 +41,25 @@ enum Ctl : int {
   kLaser3 = 1024,
   kNLaser3 = 512,
   kDetect = 1536,
-  kNDetect = 3,
-  kState = 1539,
-  kNState = 3,
+  kNDetect = 2,
+  kState = 1538,
+  kNState = 2,
 
-  kNObs = 1542,
+  kNObs = 1540,
 
   // control actions
   kAct = 0,
-  kNAct = 3,
+  kNAct = 2,
 
 };
-};  // namespace trackenv
-class TrackEnv final : public EnvBase {
+};  // namespace ObstacleEnv
+class ObstacleEnv final : public EnvBase {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  TrackEnv();
-  TrackEnv(const std::string &cfg_path);
-  ~TrackEnv();
+  ObstacleEnv();
+  ObstacleEnv(const std::string &cfg_path);
+  ~ObstacleEnv();
 
   // - public OpenAI-gym-style functions
   bool reset(Ref<Vector<>> obs, const bool random = true) override;
@@ -80,15 +77,15 @@ class TrackEnv final : public EnvBase {
   bool isTerminalState(Scalar &reward) override;
   void addObjectsToUnity(std::shared_ptr<UnityBridge> bridge);
 
-  friend std::ostream &operator<<(std::ostream &os, const TrackEnv &track_env);
-
-  Vector<3> convVel();
+  friend std::ostream &operator<<(std::ostream &os, const ObstacleEnv &track_env);
 
   // For ROS visualization
-  void visualizeObstacles(std::vector<std::shared_ptr<Obstacle>>& obstacles);
+  void visualizeObstacles(std::vector<std::shared_ptr<Obstacle>> &obstacles);
   void visualizeScan();
   void visualizeOdom();
   void visualizeTarget();
+  Vector<2> convGoal();
+  Vector<2> convVel();
 
  private:
   // ROS
@@ -105,33 +102,25 @@ class TrackEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 40, 2 * M_PI, 512, 5.0, 0.4};
-  DetectSim detect_;
-  Logger logger_{"TrackEnv"};
+  Lidar2D lidar_{20, 20, 2 * M_PI, 512, 5.0, 0.4};
+  Logger logger_{"ObstacleEnv"};
 
   int step_num_;
-  int reach_count_;
+  bool has_init_obs_;
+  int use_ros_;
 
   // Define reward for training
-  Scalar detect_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
-  int use_ros_;
-  Scalar last_alpha_, last_dist_;
-  bool has_init_reward_;
+  Scalar last_dist_, last_alpha_;
 
   // observations and actions (for RL)
-  Vector<trackenv::kNObs> track_obs_;
-  Vector<trackenv::kNAct> track_act_;
+  Vector<obstenv::kNObs> obst_obs_;
+  Vector<obstenv::kNAct> obst_act_;
 
   // reward function design (for model-free RL)
-  BBox detect_bbox_;
-  BBox desired_bbox_;
-  Vector<3> target_xyY_;
-  Scalar desired_dist_;
-  Scalar desired_dirt_;
-  bool has_init_obs_;
+  Vector<2> target_xy_;
 
   // action and observation normalization (for RL)
-  Vector<trackenv::kNAct> act_std_;
+  Vector<obstenv::kNAct> act_std_;
 
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;

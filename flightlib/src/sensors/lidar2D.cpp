@@ -412,11 +412,6 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
     }
     if (ranges[i] < min_scan) min_scan = ranges[i];
   }
-  if (is_norm) {
-    for (int i = 0; i < numRays_; ++i) {
-      ranges[i] = ranges[i] / maxRange_ - 0.5f;
-    }
-  }
 
   if ((min_scan < safe_range_) || in_obstacles) {
     is_collision = true;
@@ -424,6 +419,11 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
     // logger_.debug("close: %.2f;  in: %d", min_scan, in_obstacles);
   }
   is_collision_ = is_collision;
+  if (is_norm) {
+    for (int i = 0; i < numRays_; ++i) {
+      ranges[i] = ranges[i] / maxRange_;
+    }
+  }
   return is_collision;
 
   // =========== Method 3 =================//

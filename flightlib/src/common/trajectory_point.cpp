@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 12:48:49 +0800
- * @LastEditTime: 2025-05-15 12:48:50 +0800
+ * @LastEditTime: 2025-06-16 19:46:45 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /src/flightmare/flightlib/src/common/trajectory_point.cpp
+ * @FilePath: /flightmare/flightlib/src/common/trajectory_point.cpp
  */
 #include "flightlib/common/trajectory_point.hpp"
 

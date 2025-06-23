@@ -1,7 +1,7 @@
 /*** 
  * @Author: Flightmare
  * @Date: 2025-05-19 22:37:29 +0800
- * @LastEditTime: 2025-05-26 21:12:43 +0800
+ * @LastEditTime: 2025-06-16 14:37:29 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/wrapper/pybind_wrapper.cpp
@@ -70,4 +70,24 @@ PYBIND11_MODULE(flightgym, m) {
       return "RPG Drone Tracking Environment";
     });
 
+  py::class_<VecEnv<ObstacleEnv>>(m, "ObstEnv_v1")
+    .def(py::init<>())
+    .def(py::init<const std::string&>())
+    .def(py::init<const std::string&, const bool>())
+    .def("reset", &VecEnv<ObstacleEnv>::reset)
+    .def("step", &VecEnv<ObstacleEnv>::step)
+    .def("testStep", &VecEnv<ObstacleEnv>::testStep)
+    .def("setSeed", &VecEnv<ObstacleEnv>::setSeed)
+    .def("close", &VecEnv<ObstacleEnv>::close)
+    .def("isTerminalState", &VecEnv<ObstacleEnv>::isTerminalState)
+    .def("curriculumUpdate", &VecEnv<ObstacleEnv>::curriculumUpdate)
+    .def("connectUnity", &VecEnv<ObstacleEnv>::connectUnity)
+    .def("disconnectUnity", &VecEnv<ObstacleEnv>::disconnectUnity)
+    .def("getNumOfEnvs", &VecEnv<ObstacleEnv>::getNumOfEnvs)
+    .def("getObsDim", &VecEnv<ObstacleEnv>::getObsDim)
+    .def("getActDim", &VecEnv<ObstacleEnv>::getActDim)
+    .def("getExtraInfoNames", &VecEnv<ObstacleEnv>::getExtraInfoNames)
+    .def("__repr__", [](const VecEnv<ObstacleEnv>& a) {
+      return "RPG Drone Tracking Environment";
+    });
 }

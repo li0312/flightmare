@@ -1,10 +1,10 @@
 '''
 Author: Lac_Creeper
-Date: 2025-05-25 21:33:19 +0800
-LastEditTime: 2025-06-18 14:10:23 +0800
+Date: 2025-06-16 12:50:08 +0800
+LastEditTime: 2025-06-21 11:16:04 +0800
 LastEditors: Lac_Creeper
 Description: 
-FilePath: /flightmare/flightrl/lac_demos/track_target.py
+FilePath: /flightmare/flightrl/lac_demos/obstacle_avoidance.py
 '''
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from gymnasium.utils import seeding
@@ -18,16 +18,16 @@ import argparse
 import numpy as np
 import torch as th
 
-from lac_baselines.common.track_net import TrackCNN
-from lac_baselines.envs import vec_env_wrapper as wrapper
+from lac_baselines.common.obstacle_net import ObstacleCNN
+from lac_baselines.envs import obstacle_wrapper as wrapper
 import lac_baselines.common.util as U
+
 from test_model import test_model
 
 import rospy
-# rospy.init_node("track_env_py", anonymous=True)
-# print(rospy.Time.now().to_sec())
+rospy.init_node("obstacle_env_py", anonymous=True)
 
-from flightgym import TrackEnv_v1
+from flightgym import ObstEnv_v1
 
 
 
@@ -69,7 +69,7 @@ def main():
   
   # print("[Train]: test 1..")
   print(cfg["env"]["num_envs"])
-  env = wrapper.TrackEnvVec(TrackEnv_v1(dump(cfg, Dumper=RoundTripDumper), False))
+  env = wrapper.ObstEnvVec(ObstEnv_v1(dump(cfg, Dumper=RoundTripDumper), False))
   # print("[Train]: test 2..")
 
 
@@ -80,13 +80,13 @@ def main():
   if args.train:
     # save the configuration and other files
     rsg_root = os.path.dirname(os.path.abspath(__file__))
-    log_dir = rsg_root + "/saved"
+    log_dir = rsg_root + "/obst_saved"
     saver = U.ConfigurationSaver(log_dir=log_dir)
     model = PPO(
       tensorboard_log=saver.data_dir,
       policy="MultiInputPolicy",  # check activation function
       policy_kwargs=dict(
-          features_extractor_class=TrackCNN,
+          features_extractor_class=ObstacleCNN,
           features_extractor_kwargs=dict(features_dim=128),
           net_arch=[]),
       env=env,
@@ -95,10 +95,10 @@ def main():
       # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
       n_steps=300,
       ent_coef=0.00,
-      learning_rate=3e-4,
+      learning_rate=5e-5,
       vf_coef=0.5,
       max_grad_norm=0.5,
-      batch_size=300,
+      batch_size=900,
       n_epochs=10,
       clip_range=0.2,
       verbose=1,
@@ -125,7 +125,7 @@ def main():
 
     logger.configure(folder=saver.data_dir)
     model.learn(
-        total_timesteps=int(250000000),
+        total_timesteps=int(25000000),
         callback=checkpoint_callback,
         tb_log_name=saver.data_dir + "/ppo_run",
         reset_num_timesteps=False)

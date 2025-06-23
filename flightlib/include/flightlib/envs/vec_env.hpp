@@ -16,6 +16,7 @@
 #include "flightlib/envs/env_base.hpp"
 #include "flightlib/envs/quadrotor_env/quadrotor_env.hpp"
 #include "flightlib/envs/track_env/track_env.hpp"
+#include "flightlib/envs/obstacle_env/obstacle_env.hpp"
 
 namespace flightlib {
 

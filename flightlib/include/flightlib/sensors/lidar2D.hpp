@@ -139,10 +139,11 @@ class Lidar2D {
 
   // 高效的激光雷达模拟
   bool simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
-                     std::vector<Scalar>& ranges, bool is_norm = false);
+                     std::vector<Scalar>& ranges, Scalar safeRange,
+                     bool is_norm = false);
 
   bool simulateLidar(const QuadState& state, std::vector<Scalar>& ranges,
-                     bool is_norm = false);
+                     Scalar safeRange, bool is_norm = false);
 
   const std::vector<std::shared_ptr<Obstacle>>& getObstacles() const;
 

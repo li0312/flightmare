@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-06-16 12:28:39 +0800
- * @LastEditTime: 2025-06-20 21:08:17 +0800
+ * @LastEditTime: 2025-06-25 13:52:56 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/include/flightlib/envs/obstacle_env/obstacle_env.hpp
@@ -102,7 +102,7 @@ class ObstacleEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{20, 20, 2 * M_PI, 512, 5.0, 0.4};
+  Lidar2D lidar_{20, 20, 2 * M_PI, 512, 10.0, 0.4};
   Logger logger_{"ObstacleEnv"};
 
   int step_num_;

@@ -181,7 +181,7 @@ class ObstacleLidarSim {
     scan.range_min = 0.1;
     scan.range_max = lidar_max_range_ + 5.0;
     bool is_collision =
-      lidar2d_sim_.simulateLidar(robotPos_, robotYaw_, scan.ranges);
+      lidar2d_sim_.simulateLidar(robotPos_, robotYaw_, scan.ranges, 0.4);
     scan_pub_.publish(scan);
     lidar_timer_.toc();
 

@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-06-16 12:28:21 +0800
- * @LastEditTime: 2025-06-21 08:42:37 +0800
+ * @LastEditTime: 2025-06-25 14:20:05 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/envs/obstacle_env/obstacle_env.cpp
@@ -159,7 +159,7 @@ void ObstacleEnv::visualizeScan() {
   scan.scan_time = 0.1;
   scan.range_min = 0.1;
   scan.range_max = 6.0;
-  bool is_collision = lidar_.simulateLidar(quad_state_, scan.ranges, false);
+  bool is_collision = lidar_.simulateLidar(quad_state_, scan.ranges, 0.4, false);
   scan_pub_.publish(scan);
 }
 
@@ -241,7 +241,7 @@ bool ObstacleEnv::reset(Ref<Vector<>> obs, const bool random) {
       // target_xyY_.z() = uniform_dist_(random_gen_) * M_PI;
 			std::vector<Scalar> ranges;
       goal_collision =
-        lidar_.simulateLidar(target_xy_, 0.0f, ranges, false);
+        lidar_.simulateLidar(target_xy_, 0.0f, ranges, 1.0, false);
     }
     
     while (has_collision || (dist2goal < 4.0) || (dist2goal > 6.0f)) {
@@ -257,13 +257,17 @@ bool ObstacleEnv::reset(Ref<Vector<>> obs, const bool random) {
       quad_state_.x(QS::ATTY) = 0.0f;
       quad_state_.x(QS::ATTZ) = std::sin(yaw / 2.0);
       quad_state_.qx /= quad_state_.qx.norm();
+			Scalar velBody = uniform_dist_(random_gen_);
+      quad_state_.x(QS::VELX) = cos(yaw) * velBody;
+      quad_state_.x(QS::VELY) = sin(yaw) * velBody;
+      quad_state_.x(QS::VELY) = uniform_dist_(random_gen_)*0.4;
       // check distance
       Vector<2> quad_xy = {quad_state_.x(QS::POSX), quad_state_.x(QS::POSY)};
       dist2goal = (quad_xy - target_xy_).norm();
       
       // check collision
       std::vector<Scalar> temp_scan;
-      has_collision = lidar_.simulateLidar(quad_state_, temp_scan, false);
+      has_collision = lidar_.simulateLidar(quad_state_, temp_scan, 1.5, false);
       
     }
 		last_dist_ = dist2goal;
@@ -291,7 +295,7 @@ bool ObstacleEnv::getObs(Ref<Vector<>> obs) {
 
   quadrotor_ptr_->getState(&quad_state_);
   std::vector<Scalar> scan_data;
-  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, true);
+  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, 0.4, true);
   Vector<obstenv::kNLaser1> scan =
     Vector<obstenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
 
@@ -301,8 +305,7 @@ bool ObstacleEnv::getObs(Ref<Vector<>> obs) {
     obst_obs_.segment<obstenv::kNLaser3>(obstenv::kLaser3) = scan;
     obst_obs_.segment<obstenv::kNDetect>(obstenv::kDetect) =
       convGoal();
-    obst_obs_.segment<obstenv::kNState>(obstenv::kState) =
-      Vector<obstenv::kNAct>::Zero();
+    obst_obs_.segment<obstenv::kNState>(obstenv::kState) = convVel();
     has_init_obs_ = true;
   } else {
     obst_obs_.segment<obstenv::kNLaser1>(obstenv::kLaser1) =
@@ -336,7 +339,8 @@ Scalar ObstacleEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   obst_act_ = act.cwiseProduct(act_std_);
   cmd_.t += sim_dt_;
-  cmd_.linear.x() = (obst_act_[0] + 1.0) / 2.0;
+  // cmd_.linear.x() = (obst_act_[0] + 1.0) / 2.0;
+  cmd_.linear.x() = obst_act_[0];
   cmd_.angular.z() = obst_act_[1];
 
   // simulate quadrotor
@@ -352,15 +356,15 @@ Scalar ObstacleEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 	Scalar dist_reward = (last_dist_ - dist) * 2.5;
 	Vector<2> local_target = convGoal();
 	Scalar alpha = local_target.x() / local_target.norm();
-  Scalar alpha_reward = (alpha - 1.0) * 0.05;
-	alpha_reward = 0.0;
+  Scalar alpha_reward = (alpha - 1.0) * 0.02;
+	// alpha_reward = 0.0;
   last_alpha_ = alpha;
 	last_dist_ = dist;
 	// - action term
 	Scalar act_reward = 0;
-	if (abs(quad_state_.x(QS::OMEZ)) > 0.6) {
-    act_reward = -0.2 * (abs(quad_state_.x(QS::OMEZ)) - 0.6);
-  }
+	// if (abs(quad_state_.x(QS::OMEZ)) > 0.6) {
+  //   act_reward = -0.2 * (abs(quad_state_.x(QS::OMEZ)) - 0.6);
+  // }
 	// logger_.debug("[DIST]: %.2f, [ALPHA]: %.2f", dist_reward, alpha_reward);
 
   Scalar total_reward = dist_reward + act_reward + alpha_reward;
@@ -378,20 +382,20 @@ Scalar ObstacleEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 bool ObstacleEnv::isTerminalState(Scalar &reward) {
   Vector<2> quad_xy = {quad_state_.x(QS::POSX), quad_state_.x(QS::POSY)};
   Scalar dist = (quad_xy - target_xy_).norm();
-  if (dist < 0.5) {
-    reward = 20.0;
+  if (dist < 0.4) {
+    reward = 30.0;
     logger_.debug("reach goal..%d", step_num_);
     return true;
   }
   if (lidar_.isCollision()) {
-    reward = -20.0;
+    reward = -30.0;
     logger_.warn("drone collision..%.d", step_num_);
     return true;
   }
-  if (step_num_ >= 300) {
+  if (step_num_ >= 310) {
     reward = 0.0f;
-    logger_.warn("time out..");
-    return true;
+    logger_.warn("time out..%d", step_num_);
+    // return true;
   }
   if ((abs(quad_state_.v.x()) > 2.5) || (abs(quad_state_.v.y()) > 2.5)) {
     reward = -5.0f;

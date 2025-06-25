@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:38:23 +0800
- * @LastEditTime: 2025-05-29 14:50:49 +0800
+ * @LastEditTime: 2025-06-25 19:26:06 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/sensors/detect.cpp
@@ -74,7 +74,7 @@ bool DetectSim::getBBox(const QuadState& state, BBox& out_bbox) {
   v_min = std::clamp(v_min, 0, height_);
   v_max = std::clamp(v_max, 0, height_);
 
-  bool is_valid = (u_max > u_min) && (v_max > v_min);
+  bool is_valid = (u_max > u_min) && (v_max > (v_min + 20));
   if (is_valid) {
     out_bbox = {u_min, v_min, u_max, v_max};
   } else {

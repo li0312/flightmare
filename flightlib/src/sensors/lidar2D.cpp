@@ -372,7 +372,8 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
 }
 
 bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
-                            std::vector<Scalar>& ranges, bool is_norm) {
+                            std::vector<Scalar>& ranges, Scalar safeRange,
+                            bool is_norm) {
   // buildTree();  // 确保树已构建
 
   ranges.assign(numRays_, maxRange_);
@@ -413,7 +414,7 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
     if (ranges[i] < min_scan) min_scan = ranges[i];
   }
 
-  if ((min_scan < safe_range_) || in_obstacles) {
+  if ((min_scan < safeRange) || in_obstacles) {
     is_collision = true;
     // logger_.warn("ENVIRONMENT COLLISION DETECTED!!");
     // logger_.debug("close: %.2f;  in: %d", min_scan, in_obstacles);
@@ -421,7 +422,8 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
   is_collision_ = is_collision;
   if (is_norm) {
     for (int i = 0; i < numRays_; ++i) {
-      ranges[i] = ranges[i] / maxRange_;
+      // ranges[i] = ranges[i] / maxRange_;
+      ranges[i] = exp(-ranges[i]);
     }
   }
   return is_collision;
@@ -446,11 +448,11 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
 }
 
 bool Lidar2D::simulateLidar(const QuadState& state, std::vector<Scalar>& ranges,
-                            bool is_norm) {
+                            Scalar safeRange, bool is_norm) {
   Vector<2> robot_pose{state.p.x(), state.p.y()};
   Vector<3> euler_xyz = state.euler_xyz();
   Scalar robot_yaw = euler_xyz.z();
-  return simulateLidar(robot_pose, robot_yaw, ranges, is_norm);
+  return simulateLidar(robot_pose, robot_yaw, ranges, safeRange, is_norm);
 }
 
 const std::vector<std::shared_ptr<Obstacle>>& Lidar2D::getObstacles() const {

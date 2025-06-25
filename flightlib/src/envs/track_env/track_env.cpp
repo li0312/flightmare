@@ -19,10 +19,10 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
     detect_coeff_{0.0f},
     pos_coeff_{0.0f},
     theta_coeff_{0.0f},
-    act_coeff_{0.0f},
-    use_ros_{0} {
+    act_coeff_{0.0f} {
   // load configuration file
   YAML::Node cfg_ = YAML::LoadFile(cfg_path);
+  logger_.info("use_ros: %d", use_ros_);
 
   if (use_ros_) {
     int argc = 0;
@@ -62,7 +62,7 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
   desired_bbox_ = {449, 158, 510, 362};
 
   // lidar settings
-  lidar_.generateRandomMap(20, 20);
+  lidar_.generateRandomMap(10, 10);
 
   // load parameters
   loadParam(cfg_);
@@ -89,7 +89,7 @@ void TrackEnv::visualizeObstacles(std::vector<std::shared_ptr<Obstacle>>& obstac
 
   for (const auto &obs : obstacles) {
     visualization_msgs::Marker marker;
-    marker.header.frame_id = "map";
+    marker.header.frame_id = "world";
     marker.header.stamp = ros::Time::now();
     marker.ns = "obstacles";
     marker.id = id++;
@@ -158,7 +158,7 @@ void TrackEnv::visualizeScan() {
     tf::Quaternion(0, 0, sin(robot_yaw / 2), cos(robot_yaw / 2)));
   // transform.setRotation(tf::Quaternion(0, 0, 0, 1));
   br.sendTransform(
-    tf::StampedTransform(transform, ros::Time::now(), "map", "base_laser"));
+    tf::StampedTransform(transform, ros::Time::now(), "world", "base_laser"));
 
   sensor_msgs::LaserScan scan;
   scan.header.stamp = ros::Time::now();
@@ -171,14 +171,14 @@ void TrackEnv::visualizeScan() {
   scan.range_min = 0.1;
   scan.range_max = 6.0;
   bool is_collision =
-    lidar_.simulateLidar(quad_state_, scan.ranges, false);
+    lidar_.simulateLidar(quad_state_, scan.ranges, 0.4, false);
   scan_pub_.publish(scan);
 }
 
 void TrackEnv::visualizeOdom() {
   nav_msgs::Odometry odom;
   odom.header.stamp = ros::Time::now();
-  odom.header.frame_id = "map";
+  odom.header.frame_id = "world";
   odom.pose.pose.position.x = quad_state_.x[QS::POSX];
   odom.pose.pose.position.y = quad_state_.x[QS::POSY];
   odom.pose.pose.position.z = quad_state_.x[QS::POSZ];
@@ -197,7 +197,7 @@ void TrackEnv::visualizeOdom() {
 
 void TrackEnv::visualizeTarget() {
   visualization_msgs::Marker target;
-  target.header.frame_id = "map";
+  target.header.frame_id = "world";
   target.ns = "target";
   target.id = 0;
   target.type = visualization_msgs::Marker::SPHERE;
@@ -236,8 +236,8 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
 
     while (has_collision || (!has_visual)) {
       // randomly reset the quadrotor state
-      Scalar init_x = uniform_dist_(random_gen_) * 10.0f;
-      Scalar init_y = uniform_dist_(random_gen_) * 10.0f;
+      Scalar init_x = uniform_dist_(random_gen_) * 5.0f;
+      Scalar init_y = uniform_dist_(random_gen_) * 5.0f;
       Scalar tag_x = uniform_dist_(random_gen_) * 2.5f + desired_dist_;
       Scalar tag_y = uniform_dist_(random_gen_) * 1.5f;
       // Scalar tag_x = desired_dist_;
@@ -255,10 +255,11 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
       target_xyY_.x() = init_x + tag_x * std::cos(yaw) - tag_y * std::sin(yaw);
       target_xyY_.y() = init_y + tag_x * std::sin(yaw) + tag_y * std::cos(yaw);
       target_xyY_.z() = 0.0;
+      targetInitPose_ = target_xyY_;
       // target_xyY_.z() = uniform_dist_(random_gen_) * M_PI;
       // check collision
       std::vector<Scalar> temp_scan;
-      has_collision = lidar_.simulateLidar(quad_state_, temp_scan, true);
+      has_collision = lidar_.simulateLidar(quad_state_, temp_scan, 1.0, false);
       // lidar_.renderPointCloud(quad_state_);
       // has_collision = lidar_.isCollision();
       // check target in FOV
@@ -291,7 +292,7 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
   // lidar_.renderLaserScan(quad_state_, true);
   // const auto &scan_data = lidar_.getScan();
   std::vector<Scalar> scan_data;
-  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, true);
+  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, 0.4, true);
 
   Vector<trackenv::kNLaser1> scan =
     Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
@@ -344,11 +345,12 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   // simulate quadrotor
   quadrotor_ptr_->velocityControlBody(cmd_, sim_dt_);
 
-
-  target_xyY_.x() += 0.5 * sim_dt_;
-  target_xyY_.y() += 0.2 * sim_dt_;
-  detect_.updateTarget(target_xyY_);
-  visualizeTarget();
+  if (use_ros_) {
+    target_xyY_.x() = targetInitPose_.x() + 4 * sin(2 * M_PI / 60 * cmd_.t);
+    target_xyY_.y() = targetInitPose_.y() + 4 * sin(2 * M_PI / 30 * cmd_.t);
+    detect_.updateTarget(target_xyY_);
+    visualizeTarget();
+  }
 
   // update observations
   getObs(obs);
@@ -366,20 +368,17 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //   ((quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0))
   //      .norm() -
   //    desired_dist_);
-  Vector<2> vector_dir = 
-      (quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0)).normalized();
-  Vector<3> euler_xyz = quad_state_.euler_xyz();
-  Scalar yaw = euler_xyz.z();
+  Vector<2> target2drone = 
+      target_xyY_.segment<2>(0) - quad_state_.x.segment<2>(QS::POS);
+  Vector<2> vector_dir = target2drone.normalized();
+  Scalar yaw = quad_state_.euler_xyz().z();
   if (!has_init_reward_) {
     last_alpha_ = cos(yaw) * vector_dir.x() + sin(yaw) * vector_dir.y();
-    last_dist_ =
-      abs((quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0)).norm() -
-      desired_dist_);
+    last_dist_ = abs(target2drone.norm() - desired_dist_);
     has_init_reward_ = true;
   }
   Scalar alpha = cos(yaw) * vector_dir.x() + sin(yaw) * vector_dir.y();
-  Scalar dist =
-    abs((quad_state_.x.segment<2>(QS::POS) - target_xyY_.segment<2>(0)).norm() - desired_dist_);
+  Scalar dist = abs(target2drone.norm() - desired_dist_);
 
   Scalar pos_reward = (last_dist_ - dist) * 2.5 + 
                       (alpha - last_alpha_) * 0.5;
@@ -399,10 +398,10 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   if ((std::abs(track_obs_[trackenv::kDetect]) < 30.0 / 960.0) &&
       (std::abs(track_obs_[trackenv::kDetect + 1]) < 30.0 / 540.0) &&
       (std::abs(track_obs_[trackenv::kDetect + 2]) < 30.0 / 540.0)) {
-    reach_reward = 0.5;
+    reach_reward = 0.2;
     reach_count_ += 1;
     if (reach_count_ > 10) {
-      reach_reward += 1.0;
+      reach_reward += 0.5;
     }
   } else {
     reach_count_ = 0;
@@ -425,25 +424,26 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
 bool TrackEnv::isTerminalState(Scalar &reward) {
   if (!detect_bbox_.is_valid()) {
-    reward = -20;
+    reward = -30;
     logger_.warn("target loss..%d", step_num_);
     return true;
   }
   if (lidar_.isCollision()) {
-    reward = -25;
+    reward = -35;
     logger_.warn("drone collision..%.d", step_num_);
     return true;
   }
   if (step_num_ >= 300) {
-    if (reach_count_ > 10) {
-      reward = 20;
-      logger_.debug("time out..%d", reach_count_);
+    logger_.debug("time out..%d, %d", step_num_, reach_count_);
+  //   if (reach_count_ > 10) {
+  //     reward = 30;
+  //     logger_.debug("time out..%d", reach_count_);
 
-    } else {
-      reward = 10;
-      logger_.warn("time out..%d", reach_count_);
-    }
-    return true;
+  //   } else {
+  //     reward = 0;
+  //     logger_.warn("time out..%d", reach_count_);
+  //   }
+  //   return true;
   }
   if ((abs(quad_state_.v.x()) > 2.0) || (abs(quad_state_.v.y()) > 2.0)) {
     logger_.fatal("control error..%d", step_num_);
@@ -457,6 +457,7 @@ bool TrackEnv::loadParam(const YAML::Node &cfg) {
     sim_dt_ = cfg["track_env"]["sim_dt"].as<Scalar>();
     max_t_ = cfg["track_env"]["max_t"].as<Scalar>();
     use_ros_ = cfg["track_env"]["use_ros"].as<int>();
+    logger_.info("cfg:use_ros: %d", cfg["track_env"]["use_ros"].as<int>());
   } else {
     return false;
   }

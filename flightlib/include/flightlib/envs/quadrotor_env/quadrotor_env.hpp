@@ -73,6 +73,8 @@ class QuadrotorEnv final : public EnvBase {
   Command cmd_;
   Logger logger_{"QaudrotorEnv"};
 
+  int step_num_;
+
   // Define reward for training
   Scalar pos_coeff_, ori_coeff_, lin_vel_coeff_, ang_vel_coeff_, act_coeff_;
 

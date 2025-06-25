@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-06-16 12:50:08 +0800
-LastEditTime: 2025-06-21 11:16:04 +0800
+LastEditTime: 2025-06-24 13:06:53 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_demos/obstacle_avoidance.py
@@ -25,7 +25,7 @@ import lac_baselines.common.util as U
 from test_model import test_model
 
 import rospy
-rospy.init_node("obstacle_env_py", anonymous=True)
+# rospy.init_node("obstacle_env_py", anonymous=True)
 
 from flightgym import ObstEnv_v1
 
@@ -35,8 +35,8 @@ def configure_random_seed(seed, env=None):
   if env is not None:
     env._np_random, env._np_random_seed = seeding.np_random(seed)
   np.random.seed(seed)
-  th.manual_seed(seed)
-  th.cuda.manual_seed(seed)
+  # th.manual_seed(seed)
+  # th.cuda.manual_seed(seed)
   # tr.backends.cudnn.deterministic = True  # 确保CUDA卷积运算结果确定
   # tr.backends.cudnn.benchmark = False     # 关闭自动优化（避免随机性）
 

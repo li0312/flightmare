@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 13:06:03 +0800
- * @LastEditTime: 2025-06-16 19:49:08 +0800
+ * @LastEditTime: 2025-06-25 16:06:19 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightros/src/lac_test/vel_control_test.cpp
@@ -288,6 +288,10 @@ int main(int argc, char *argv[]) {
     }
     
     std::cout << state4test << std::endl;
+    Vector<2> test_vector = Vector<2>{3.0, 4.0};
+    Vector<2> test_vector_norm = test_vector.normalized();
+    std::cout << "test vector:" << test_vector << std::endl;
+    std::cout << "test norm:" << test_vector_norm << std::endl;
     Vector<3> euler_xyz = state4test.euler_xyz();
     Scalar yaw = euler_xyz.z();
     Scalar body_vel_x =

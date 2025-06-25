@@ -75,6 +75,8 @@ bool QuadrotorEnv::reset(Ref<Vector<>> obs, const bool random) {
   cmd_.t = 0.0;
   cmd_.thrusts.setZero();
 
+  step_num_ = 0;
+
   // obtain observations
   getObs(obs);
   return true;
@@ -135,6 +137,7 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   // survival reward
   total_reward += 0.1;
+  step_num_ += 1;
 
   return total_reward;
 }
@@ -142,6 +145,11 @@ Scalar QuadrotorEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 bool QuadrotorEnv::isTerminalState(Scalar &reward) {
   if (quad_state_.x(QS::POSZ) <= 0.02) {
     reward = -0.02;
+    return true;
+  }
+  if (step_num_ >= 300) {
+    reward = 0.0;
+    // logger_.debug("time out..%d", step_num_);
     return true;
   }
   reward = 0.0;

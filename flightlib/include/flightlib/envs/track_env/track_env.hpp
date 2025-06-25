@@ -115,6 +115,7 @@ class TrackEnv final : public EnvBase {
   // Define reward for training
   Scalar detect_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
   int use_ros_;
+  Vector<3> targetInitPose_;
   Scalar last_alpha_, last_dist_;
   bool has_init_reward_;
 

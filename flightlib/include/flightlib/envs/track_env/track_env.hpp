@@ -45,10 +45,12 @@ enum Ctl : int {
   kNLaser3 = 512,
   kDetect = 1536,
   kNDetect = 3,
-  kState = 1539,
+  kDirt = 1539,
+  kNDirt = 2,
+  kState = 1541,
   kNState = 3,
 
-  kNObs = 1542,
+  kNObs = 1544,
 
   // control actions
   kAct = 0,
@@ -105,7 +107,7 @@ class TrackEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 40, 2 * M_PI, 512, 5.0, 0.4};
+  Lidar2D lidar_{40, 40, 2 * M_PI, 512, 10.0, 0.4};
   DetectSim detect_;
   Logger logger_{"TrackEnv"};
 
@@ -116,7 +118,7 @@ class TrackEnv final : public EnvBase {
   Scalar detect_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
   int use_ros_;
   Vector<3> targetInitPose_;
-  Scalar last_alpha_, last_dist_;
+  Scalar last_alpha_, last_dist_, last_theta_;
   bool has_init_reward_;
 
   // observations and actions (for RL)

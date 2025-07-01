@@ -17,6 +17,25 @@
         <param name="mesh_resource" value="package://odom_visualization/meshes/yunque.dae"/>
     </node>
 
-    <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find flightros)/launch/lac_test/temp_test.rviz"/>
+    <node pkg="odom_visualization" name="target_odom_visualization" type="odom_visualization"
+          output="screen">
+        <remap from="~odom" to="target"/>
+        <remap from="~cmd" to="target_pos_cmd"/>
+        <param name="init_x" value="0"/>
+        <param name="init_y" value="0"/>
+        <param name="init_z" value="0"/>
+        <param name="color/a" value="0.8"/>
+        <param name="color/r" value="0.0"/>
+        <param name="color/g" value="1.0"/>
+        <param name="color/b" value="0.0"/>
+        <param name="covariance_scale" value="100.0"/>
+        <param name="robot_scale" value="0.35"/>
+        <param name="quadrotor_name" value="target"/>
+        <param name="drone_id" value="0"/>
+        <param name="mesh_resource" value="package://odom_visualization/meshes/spide_man.dae"/>
+    </node>
+
+    <node name="rviz_1" pkg="rviz" type="rviz"  args="-d $(find flightros)/launch/lac_test/temp_test1.rviz"/>
+    <node name="rviz_2" pkg="rviz" type="rviz"  args="-d $(find flightros)/launch/lac_test/temp_test2.rviz"/>
 
 </launch>

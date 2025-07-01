@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2025-06-24 12:35:40 +0800
-LastEditTime: 2025-06-24 13:42:14 +0800
+LastEditTime: 2025-06-30 12:19:44 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /flightmare/flightrl/lac_demos/drone_control.py
@@ -193,7 +193,7 @@ def main():
       learning_rate=3e-4,
       vf_coef=0.5,
       max_grad_norm=0.5,
-      batch_size=30000,
+      batch_size=32,
       n_epochs=10,
       clip_range=0.2,
       verbose=1,

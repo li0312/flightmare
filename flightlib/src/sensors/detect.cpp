@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:38:23 +0800
- * @LastEditTime: 2025-06-25 19:26:06 +0800
+ * @LastEditTime: 2025-07-01 14:09:43 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/src/sensors/detect.cpp
@@ -35,11 +35,12 @@ DetectSim::DetectSim()
 
 DetectSim::~DetectSim() {}
 
-bool DetectSim::getBBox(const QuadState& state, BBox& out_bbox) {
-  std::vector<Vector2i> projected_points;
+bool DetectSim::getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB, BBox& out_bbox) {
 
-  R_WB_ = state.R();
-  t_WB_ = state.p;
+  t_WB_ = t_WB;
+  R_WB_ = R_WB;
+
+  std::vector<Vector2i> projected_points;
 
   for (const auto& pose : target_cube_) {
     Vector<3> p_body = R_WB_.transpose() * (pose - t_WB_);
@@ -84,6 +85,12 @@ bool DetectSim::getBBox(const QuadState& state, BBox& out_bbox) {
 
   return is_valid;
 
+}
+
+bool DetectSim::getBBox(const QuadState& state, BBox& out_bbox) {
+  Vector<3> t_WB = state.p;
+  Matrix<3, 3> R_WB = state.R();
+  return getBBox(t_WB, R_WB, out_bbox);
 }
 
 void DetectSim::updateTarget(const Ref<Vector<3>> target_xyY) {

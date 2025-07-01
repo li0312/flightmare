@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:10:17 +0800
- * @LastEditTime: 2025-05-26 15:41:06 +0800
+ * @LastEditTime: 2025-07-01 14:08:08 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /flightmare/flightlib/include/flightlib/sensors/detect.hpp
@@ -83,6 +83,7 @@ class DetectSim : SensorBase {
     bool setFOV(const Scalar fov);
 
     // public get functions
+    bool DetectSim::getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB, BBox& out_bbox);
     bool getBBox(const QuadState& state, BBox& out_bbox);
     Matrix<4, 4> getRelPose() const;
     int getWidth() const;

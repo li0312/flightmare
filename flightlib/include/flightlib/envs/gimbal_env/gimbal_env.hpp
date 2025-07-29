@@ -5,7 +5,7 @@
  * @LastEditors: Lac_Creeper
  * @Description:
  * @FilePath:
- * /flightmare/flightlib/include/flightlib/envs/track_env/track_env.hpp
+ * /flightmare/flightlib/include/flightlib/envs/gimbal_env/gimbal_env.hpp
  */
 #pragma once
 
@@ -31,7 +31,7 @@
 
 namespace flightlib {
 
-namespace trackenv {
+namespace gtenv {
 
 enum Ctl : int {
   // observations
@@ -57,14 +57,14 @@ enum Ctl : int {
   kNAct = 3,
 
 };
-};  // namespace trackenv
-class TrackEnv final : public EnvBase {
+};  // namespace gtenv
+class GimbalEnv final : public EnvBase {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  TrackEnv();
-  TrackEnv(const std::string &cfg_path);
-  ~TrackEnv();
+  GimbalEnv();
+  GimbalEnv(const std::string &cfg_path);
+  ~GimbalEnv();
 
   // - public OpenAI-gym-style functions
   bool reset(Ref<Vector<>> obs, const bool random = true) override;
@@ -82,15 +82,19 @@ class TrackEnv final : public EnvBase {
   bool isTerminalState(Scalar &reward) override;
   void addObjectsToUnity(std::shared_ptr<UnityBridge> bridge);
 
-  friend std::ostream &operator<<(std::ostream &os, const TrackEnv &track_env);
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const GimbalEnv &gimbal_env);
 
   Vector<3> convVel();
 
   // For ROS visualization
-  void visualizeObstacles(std::vector<std::shared_ptr<Obstacle>>& obstacles);
+  void visualizeObstacles(std::vector<std::shared_ptr<Obstacle>> &obstacles);
   void visualizeScan();
   void visualizeOdom();
+  void visualizeGimbal();
   void visualizeTarget();
+  Matrix<3, 3> yawToR(Scalar yaw);
+  bool isReach(Scalar theta);
 
  private:
   // ROS
@@ -98,6 +102,7 @@ class TrackEnv final : public EnvBase {
   // ros::NodeHandle nh_;
   ros::Publisher map_pub_;
   ros::Publisher odom_pub_;
+  ros::Publisher gimbalPose_pub_;
   ros::Publisher scan_pub_;
   ros::Publisher target_pub_;
 
@@ -109,7 +114,8 @@ class TrackEnv final : public EnvBase {
   // Lidar lidar_;
   Lidar2D lidar_{40, 40, 2 * M_PI, 512, 10.0, 0.4};
   DetectSim detect_;
-  Logger logger_{"TrackEnv"};
+  Logger logger_{"GimbalEnv"};
+  Scalar gimbalY_, gimbalWz_;
 
   int step_num_;
   int reach_count_;
@@ -122,8 +128,8 @@ class TrackEnv final : public EnvBase {
   bool has_init_reward_;
 
   // observations and actions (for RL)
-  Vector<trackenv::kNObs> track_obs_;
-  Vector<trackenv::kNAct> track_act_, last_act_;
+  Vector<gtenv::kNObs> gimbal_obs_;
+  Vector<gtenv::kNAct> gimbal_act_;
 
   // reward function design (for model-free RL)
   BBox detect_bbox_;
@@ -134,7 +140,7 @@ class TrackEnv final : public EnvBase {
   bool has_init_obs_;
 
   // action and observation normalization (for RL)
-  Vector<trackenv::kNAct> act_std_;
+  Vector<gtenv::kNAct> act_std_;
 
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;

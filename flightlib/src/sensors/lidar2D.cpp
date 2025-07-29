@@ -422,7 +422,7 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
   is_collision_ = is_collision;
   if (is_norm) {
     for (int i = 0; i < numRays_; ++i) {
-      // ranges[i] = ranges[i] / maxRange_;
+      // ranges[i] = ranges[i] / maxRange_ - 0.5;
       ranges[i] = exp(-ranges[i]);
     }
   }

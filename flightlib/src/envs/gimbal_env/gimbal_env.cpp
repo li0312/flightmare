@@ -6,15 +6,15 @@
  * @Description:
  * @FilePath: /flightmare/flightlib/src/envs/track_env/track_env.cpp
  */
-#include "flightlib/envs/track_env/track_env.hpp"
+#include "flightlib/envs/gimbal_env/gimbal_env.hpp"
 
 namespace flightlib {
 
-TrackEnv::TrackEnv()
-  : TrackEnv(getenv("FLIGHTMARE_PATH") +
-             std::string("/flightlib/configs/track_env.yaml")) {}
+GimbalEnv::GimbalEnv()
+  : GimbalEnv(getenv("FLIGHTMARE_PATH") +
+              std::string("/flightlib/configs/gimbal_env.yaml")) {}
 
-TrackEnv::TrackEnv(const std::string &cfg_path)
+GimbalEnv::GimbalEnv(const std::string &cfg_path)
   : EnvBase(),
     detect_coeff_{0.0f},
     pos_coeff_{0.0f},
@@ -30,13 +30,14 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
   if (use_ros_) {
     int argc = 0;
     char **argv = NULL;
-    ros::init(argc, argv, "track_env_cpp");
+    ros::init(argc, argv, "gimbal_env_cpp");
 
     nh_ = std::make_unique<ros::NodeHandle>();
 
     map_pub_ = nh_->advertise<visualization_msgs::MarkerArray>("/obstacles", 1);
     scan_pub_ = nh_->advertise<sensor_msgs::LaserScan>("/scan", 1);
     odom_pub_ = nh_->advertise<nav_msgs::Odometry>("/odom", 1);
+    gimbalPose_pub_ = nh_->advertise<nav_msgs::Odometry>("/gimbalPose", 1);
     target_pub_ = nh_->advertise<nav_msgs::Odometry>("/target", 1);
   }
 
@@ -53,19 +54,19 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
   }
 
   // define input and output dimension for the environment
-  obs_dim_ = trackenv::kNObs;
-  act_dim_ = trackenv::kNAct;
+  obs_dim_ = gtenv::kNObs;
+  act_dim_ = gtenv::kNAct;
 
   act_std_.setZero();
-  act_std_.x() = 2.0f;
-  act_std_.y() = 2.0f;
+  act_std_.x() = 1.0f;
+  act_std_.y() = 1.0f;
   act_std_.z() = 1.0f;
   // detect settings
   desired_dist_ = 6.0f;
   desired_bbox_ = {449, 158, 510, 362};
 
   // lidar settings
-  lidar_.generateRandomMap(20, 20);
+  lidar_.generateRandomMap(15, 15);
 
   if (use_ros_) {
     std::vector<std::shared_ptr<Obstacle>> obstacles;
@@ -76,42 +77,43 @@ TrackEnv::TrackEnv(const std::string &cfg_path)
       loop_rate.sleep();
     }
   }
-  
+
   logger_.debug("Init success..");
 }
 
-TrackEnv::~TrackEnv() {}
+GimbalEnv::~GimbalEnv() {}
 
 
-Vector<3> TrackEnv::convVel() {
+Vector<3> GimbalEnv::convVel() {
   Scalar yaw = quad_state_.euler_xyz().z();
   Vector<3> localVel;
   localVel.x() = cos(yaw) * quad_state_.v.x() + sin(yaw) * quad_state_.v.y();
-  localVel.y() = -sin(yaw) * quad_state_.v.x() + cos(yaw) * quad_state_.v.y();
+  Scalar local_vy =
+    -sin(yaw) * quad_state_.v.x() + cos(yaw) * quad_state_.v.y();
   // logger_.info("local_v: [%.2f, %.2f]", localVel.x(), local_vy);
-  localVel.z() = quad_state_.x(QS::OMEZ);
+  localVel.y() = quad_state_.x(QS::OMEZ);
+  localVel.z() = gimbal_act_[2];
   return localVel;
 }
 
-bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
+bool GimbalEnv::reset(Ref<Vector<>> obs, const bool random) {
   step_num_ = 0;
   reach_count_ = 0;
   quad_state_.setZero();
-  track_act_.setZero();
-  last_act_.setZero();
+  gimbal_act_.setZero();
+
+  Scalar yaw_hat = 0.0;
+  std::vector<Scalar> temp_scan;
+  bool has_collision = true;
+  bool has_visual = false;
 
   if (random) {
-    bool has_collision = true;
-    bool has_visual = false;
-
     while (has_collision || (!has_visual)) {
       // randomly reset the quadrotor state
       Scalar init_x = uniform_dist_(random_gen_) * 5.0f;
       Scalar init_y = uniform_dist_(random_gen_) * 5.0f;
-      Scalar tag_x = uniform_dist_(random_gen_) * 5.0f + 2.0 + desired_dist_;
-      Scalar tag_y = uniform_dist_(random_gen_) * 2.0f;
-      // Scalar tag_x = desired_dist_;
-      // Scalar tag_y = 0.0f;
+      Scalar tag_x = uniform_dist_(random_gen_) * 4.0f + 1.0 + desired_dist_;
+      Scalar tag_y = uniform_dist_(random_gen_) * 1.5f;
       quad_state_.x(QS::POSX) = init_x;
       quad_state_.x(QS::POSY) = init_y;
       quad_state_.x(QS::POSZ) = 0.8f;
@@ -121,20 +123,22 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
       quad_state_.x(QS::ATTY) = 0.0f;
       quad_state_.x(QS::ATTZ) = std::sin(yaw / 2.0);
       quad_state_.qx /= quad_state_.qx.norm();
+      // REVIEW:
+      gimbalY_ = uniform_dist_(random_gen_) * M_PI;
+      yaw_hat = yaw + gimbalY_;
       // reset the target
-      target_xyY_.x() = init_x + tag_x * std::cos(yaw) - tag_y * std::sin(yaw);
-      target_xyY_.y() = init_y + tag_x * std::sin(yaw) + tag_y * std::cos(yaw);
-      target_xyY_.z() = 0.0;
+      target_xyY_.x() =
+        init_x + tag_x * std::cos(yaw_hat) - tag_y * std::sin(yaw_hat);
+      target_xyY_.y() =
+        init_y + tag_x * std::sin(yaw_hat) + tag_y * std::cos(yaw_hat);
+      target_xyY_.z() = uniform_dist_(random_gen_) * M_PI;
       targetInitPose_ = target_xyY_;
-      // target_xyY_.z() = uniform_dist_(random_gen_) * M_PI;
       // check collision
-      std::vector<Scalar> temp_scan;
       has_collision = lidar_.simulateLidar(quad_state_, temp_scan, 1.0, false);
-      // lidar_.renderPointCloud(quad_state_);
-      // has_collision = lidar_.isCollision();
       // check target in FOV
       detect_.updateTarget(target_xyY_);
-      detect_.getBBoxG(quad_state_, detect_bbox_);
+      Matrix<3, 3> gimbalR = yawToR(yaw_hat);
+      detect_.getBBox(quad_state_.p, gimbalR, detect_bbox_);
       has_visual = detect_bbox_.is_valid();
     }
   }
@@ -145,82 +149,92 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
   cmd_.angular.setZero();
 
   // obtain observations
-  has_init_obs_ = false;
-  has_init_reward_ = false;
   if (use_ros_) {
     visualizeTarget();
   }
-  getObs(obs);
-  // logger_.debug("reset success..");
-  return true;
-}
-
-bool TrackEnv::getObs(Ref<Vector<>> obs) {
-  // logger_.debug("getObs start..");
-
-  quadrotor_ptr_->getState(&quad_state_);
-  // lidar_.renderLaserScan(quad_state_, true);
-  // const auto &scan_data = lidar_.getScan();
-  std::vector<Scalar> scan_data;
-  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, 0.4, true);
-
-  Vector<trackenv::kNLaser1> scan =
-    Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
-
-  detect_.getBBoxG(quad_state_, detect_bbox_);
-
-  Scalar yaw = quad_state_.euler_xyz().z();
-  Scalar theta = target_xyY_.z() - yaw;
-
-  if (!has_init_obs_) {
-    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) = scan;
-    track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) = scan;
-    track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
-    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
-      detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNDirt>(trackenv::kDirt) = 
-      Vector<trackenv::kNDirt>{std::cos(theta), std::sin(theta)};
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) =
-      Vector<trackenv::kNAct>::Zero();
-    has_init_obs_ = true;
-  } else {
-    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) =
-      track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2);
-    track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) =
-      track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3);
-    track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
-    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
-      detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNDirt>(trackenv::kDirt) =
-      Vector<trackenv::kNDirt>{std::cos(theta), std::sin(theta)};
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) =
-      convVel();
-  }
-
-  obs.segment<trackenv::kNObs>(trackenv::kObs) = track_obs_;
-
-  // -DEBUG: 
+  // getObs(obs);
+  // - Init obs
+  // quadrotor_ptr_->getState(&quad_state_);
+  Vector<gtenv::kNLaser1> scan =
+    Vector<gtenv::kNLaser1>::Map(temp_scan.data(), temp_scan.size());
+  Scalar theta = target_xyY_.z() - yaw_hat;
+  gimbal_obs_.segment<gtenv::kNLaser1>(gtenv::kLaser1) = scan;
+  gimbal_obs_.segment<gtenv::kNLaser2>(gtenv::kLaser2) = scan;
+  gimbal_obs_.segment<gtenv::kNLaser3>(gtenv::kLaser3) = scan;
+  gimbal_obs_.segment<gtenv::kNDetect>(gtenv::kDetect) = detect_bbox_.obs();
+  gimbal_obs_.segment<gtenv::kNDirt>(gtenv::kDirt) =
+    Vector<gtenv::kNDirt>{std::cos(theta), std::sin(theta)};
+  gimbal_obs_.segment<gtenv::kNState>(gtenv::kState) =
+    Vector<gtenv::kNAct>::Zero();
+  obs.segment<gtenv::kNObs>(gtenv::kObs) = gimbal_obs_;
+  // -DEBUG:
   if (use_ros_) {
     visualizeScan();
     visualizeOdom();
+    visualizeGimbal();
     ros::Rate loop_rate(100);
     loop_rate.sleep();
   }
+  // - Init reward
+  Vector<2> target2drone =
+    target_xyY_.segment<2>(0) - quad_state_.x.segment<2>(QS::POS);
+  Scalar target_yaw = target_xyY_.z();
+  Vector<2> vector_dir = target2drone.normalized();
+  last_alpha_ = cos(yaw_hat) * vector_dir.x() + sin(yaw_hat) * vector_dir.y();
+  last_dist_ = abs(target2drone.norm() - desired_dist_);
+  last_theta_ = cos(yaw_hat) * cos(target_yaw) + sin(yaw_hat) * sin(target_yaw);
 
   return true;
 }
 
-Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
+bool GimbalEnv::getObs(Ref<Vector<>> obs) {
+  quadrotor_ptr_->getState(&quad_state_);
+  std::vector<Scalar> scan_data;
+  bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, 0.4, true);
+
+  Vector<gtenv::kNLaser1> scan =
+    Vector<gtenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
+
+  Scalar yaw = quad_state_.euler_xyz().z();
+  Scalar yaw_hat = yaw + gimbalY_;
+  Matrix<3, 3> gimbalR = yawToR(yaw_hat);
+  detect_.getBBox(quad_state_.p, gimbalR, detect_bbox_);
+  Scalar theta = target_xyY_.z() - yaw_hat;
+
+  gimbal_obs_.segment<gtenv::kNLaser1>(gtenv::kLaser1) =
+    gimbal_obs_.segment<gtenv::kNLaser2>(gtenv::kLaser2);
+  gimbal_obs_.segment<gtenv::kNLaser2>(gtenv::kLaser2) =
+    gimbal_obs_.segment<gtenv::kNLaser3>(gtenv::kLaser3);
+  gimbal_obs_.segment<gtenv::kNLaser3>(gtenv::kLaser3) = scan;
+  gimbal_obs_.segment<gtenv::kNDetect>(gtenv::kDetect) = detect_bbox_.obs();
+  gimbal_obs_.segment<gtenv::kNDirt>(gtenv::kDirt) =
+    Vector<gtenv::kNDirt>{std::cos(theta), std::sin(theta)};
+  gimbal_obs_.segment<gtenv::kNState>(gtenv::kState) = convVel();
+
+  obs.segment<gtenv::kNObs>(gtenv::kObs) = gimbal_obs_;
+  // -DEBUG:
+  if (use_ros_) {
+    visualizeScan();
+    visualizeOdom();
+    visualizeGimbal();
+    ros::Rate loop_rate(100);
+    loop_rate.sleep();
+  }
+  return true;
+}
+
+Scalar GimbalEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   step_num_ += 1;
-  last_act_ = track_act_;
-  track_act_ = act.cwiseProduct(act_std_);
+
+  gimbal_act_ = act.cwiseProduct(act_std_);
   cmd_.t += sim_dt_;
-  cmd_.linear.x() = track_act_[0];
-  cmd_.linear.y() = track_act_[1];
-  cmd_.angular.z() = track_act_[2];
+  cmd_.linear.x() = gimbal_act_[0];
+  cmd_.angular.z() = gimbal_act_[1];
+  gimbalWz_ = gimbal_act_[2];
 
   // simulate quadrotor
   quadrotor_ptr_->velocityControlBody(cmd_, sim_dt_);
+  gimbalY_ += gimbalWz_ * sim_dt_;
 
   // target_xyY_.x() = targetInitPose_.x() + 6 * sin(2 * M_PI / 160 * cmd_.t);
   // target_xyY_.y() = targetInitPose_.y() + 6 * sin(2 * M_PI / 80 * cmd_.t);
@@ -237,52 +251,46 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   // ================= reward function design ===================
   // - detection term
-  Scalar detect_reward = 0.2 * detect_bbox_.IoU(desired_bbox_);
-  // Vector<3> detect_norm = obs.segment<trackenv::kNDetect>(trackenv::kDetect);
-  // Scalar detect_reward = 
-  //     -0.1*abs(detect_norm.x()) - 0.1*abs(detect_norm.y()) - 0.1*abs(detect_norm.z());
+  // Scalar detect_reward = 0.02 * detect_bbox_.IoU(desired_bbox_);
+  Vector<3> detect_norm = obs.segment<gtenv::kNDetect>(gtenv::kDetect);
+  Scalar detect_reward = -0.1 * abs(detect_norm.x()) -
+                         0.1 * abs(detect_norm.y()) -
+                         0.1 * abs(detect_norm.z());
 
   // - position term
-  Vector<2> target2drone = 
-      target_xyY_.segment<2>(0) - quad_state_.x.segment<2>(QS::POS);
+  Vector<2> target2drone =
+    target_xyY_.segment<2>(0) - quad_state_.x.segment<2>(QS::POS);
   Scalar target_yaw = target_xyY_.z();
   Vector<2> vector_dir = target2drone.normalized();
   Scalar yaw = quad_state_.euler_xyz().z();
-  if (!has_init_reward_) {
-    last_alpha_ = cos(yaw) * vector_dir.x() + sin(yaw) * vector_dir.y();
-    last_dist_ = abs(target2drone.norm() - desired_dist_);
-    last_theta_ = cos(yaw) * cos(target_yaw) + sin(yaw) * sin(target_yaw);
-    has_init_reward_ = true;
-  }
-  Scalar alpha = cos(yaw) * vector_dir.x() + sin(yaw) * vector_dir.y();
+  Scalar yaw_hat = yaw + gimbalY_;
+  Scalar alpha = cos(yaw_hat) * vector_dir.x() + sin(yaw_hat) * vector_dir.y();
   Scalar dist = abs(target2drone.norm() - desired_dist_);
 
-  Scalar pos_reward = (last_dist_ - dist) * 0.5 + 
-                      (alpha - last_alpha_) * 0.5;
+  Scalar pos_reward = (last_dist_ - dist) * 2.5 + (alpha - last_alpha_) * 0.5;
   last_alpha_ = alpha;
   last_dist_ = dist;
 
   // - theta term
   /// TODO: add direction vector reward
-  Scalar theta = cos(yaw) * cos(target_yaw) + sin(yaw) * sin(target_yaw);
-  Scalar theta_reward = (theta - 1) * 0.05;
+  Scalar theta =
+    cos(yaw_hat) * cos(target_yaw) + sin(yaw_hat) * sin(target_yaw);
+  // Scalar theta_reward = (theta - last_theta_) * 0.5;
+  // Scalar theta_reward = (theta - 1) * 0.02;
+  Scalar theta_reward = (theta - 1) * 0.0;
   last_theta_ = theta;
 
   // - control action penalty
-  Scalar act_norm = act.cast<Scalar>().norm();
-  if (act_norm < 2.0) {
-    act_norm = 0.0;
-  }
-  Scalar act_reward = -0.0025 * act_norm - 0.005 * (track_act_ - last_act_).norm();
+  // Scalar act_reward = -0.02 * act.cast<Scalar>().norm();
+  Scalar act_reward = -0.002 * act.cast<Scalar>().norm();
 
   // - reach reward
   Scalar reach_reward = 0.0;
-  if ((detect_bbox_.IoU(desired_bbox_) > 0.8) && theta > 0.95) {
+  if (isReach(theta)) {
     reach_reward = 0.2;
     reach_count_ += 1;
-    if (reach_count_ > 10 && (detect_bbox_.IoU(desired_bbox_) > 0.85) &&
-        theta > 0.98) {
-      reach_reward += 0.3;
+    if (reach_count_ > 10) {
+      reach_reward += 0.5;
     }
   } else {
     reach_count_ = 0;
@@ -291,8 +299,8 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   Scalar total_reward =
     detect_reward + pos_reward + theta_reward + act_reward + reach_reward;
   // logger_.debug(
-  //   "[reward]: \t DET\t POS\t THE\t ACT\t REA\n"
-  //   "\t\t[VEL]: \t %.3f\t %.3f\t %.3f\t %.3f\t %.3f\n",
+  //   "[reward]:\tDET\tPOS\tTHE\tACT\tREA\n"
+  //   "\t\t[VEL]:\t\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n",
   //   detect_reward, pos_reward, theta_reward, act_reward, reach_reward);
 
   // survival reward
@@ -301,9 +309,9 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   return total_reward;
 }
 
-bool TrackEnv::isTerminalState(Scalar &reward) {
+bool GimbalEnv::isTerminalState(Scalar &reward) {
   if (!detect_bbox_.is_valid()) {
-    reward = -30;
+    reward = -50;
     logger_.warn("target loss..%d", step_num_);
     return true;
   }
@@ -315,19 +323,19 @@ bool TrackEnv::isTerminalState(Scalar &reward) {
   if (step_num_ >= 300 && reach_count_ > 20) {
     logger_.debug("time out..%d, %d", step_num_, reach_count_);
   }
-  if ((abs(quad_state_.v.x()) > 3.5) || (abs(quad_state_.v.y()) > 3.5)) {
+  if ((abs(quad_state_.v.x()) > 2.0) || (abs(quad_state_.v.y()) > 2.0)) {
     logger_.fatal("control error..%d", step_num_);
   }
   reward = 0.0f;
   return false;
 }
 
-bool TrackEnv::loadParam(const YAML::Node &cfg) {
-  if (cfg["track_env"]) {
-    sim_dt_ = cfg["track_env"]["sim_dt"].as<Scalar>();
-    max_t_ = cfg["track_env"]["max_t"].as<Scalar>();
-    use_ros_ = cfg["track_env"]["use_ros"].as<int>();
-    logger_.info("cfg:use_ros: %d", cfg["track_env"]["use_ros"].as<int>());
+bool GimbalEnv::loadParam(const YAML::Node &cfg) {
+  if (cfg["gimbal_env"]) {
+    sim_dt_ = cfg["gimbal_env"]["sim_dt"].as<Scalar>();
+    max_t_ = cfg["gimbal_env"]["max_t"].as<Scalar>();
+    use_ros_ = cfg["gimbal_env"]["use_ros"].as<int>();
+    logger_.info("cfg:use_ros: %d", cfg["gimbal_env"]["use_ros"].as<int>());
   } else {
     return false;
   }
@@ -345,7 +353,7 @@ bool TrackEnv::loadParam(const YAML::Node &cfg) {
   return true;
 }
 
-void TrackEnv::visualizeObstacles(
+void GimbalEnv::visualizeObstacles(
   std::vector<std::shared_ptr<Obstacle>> &obstacles) {
   visualization_msgs::MarkerArray markers;
   int id = 0;
@@ -409,7 +417,7 @@ void TrackEnv::visualizeObstacles(
   map_pub_.publish(markers);
 }
 
-void TrackEnv::visualizeScan() {
+void GimbalEnv::visualizeScan() {
   // 发布TF (假设机器人在地图中心)
   static tf::TransformBroadcaster br;
   tf::Transform transform;
@@ -438,7 +446,7 @@ void TrackEnv::visualizeScan() {
   scan_pub_.publish(scan);
 }
 
-void TrackEnv::visualizeOdom() {
+void GimbalEnv::visualizeOdom() {
   nav_msgs::Odometry odom;
   odom.header.stamp = ros::Time::now();
   odom.header.frame_id = "world";
@@ -449,8 +457,8 @@ void TrackEnv::visualizeOdom() {
   odom.pose.pose.orientation.x = quad_state_.x[QS::ATTX];
   odom.pose.pose.orientation.y = quad_state_.x[QS::ATTY];
   odom.pose.pose.orientation.z = quad_state_.x[QS::ATTZ];
-  // odom.twist.twist.linear.x = track_act_.x();
-  // odom.twist.twist.linear.y = track_act_.y();
+  // odom.twist.twist.linear.x = gimbal_act_.x();
+  // odom.twist.twist.linear.y = gimbal_act_.y();
   odom.twist.twist.linear.x = quad_state_.x(QS::VELX);
   odom.twist.twist.linear.y = quad_state_.x(QS::VELY);
   odom.twist.twist.linear.z = 0.0;
@@ -460,7 +468,24 @@ void TrackEnv::visualizeOdom() {
   odom_pub_.publish(odom);
 }
 
-void TrackEnv::visualizeTarget() {
+void GimbalEnv::visualizeGimbal() {
+  nav_msgs::Odometry gimbalPose;
+  gimbalPose.header.stamp = ros::Time::now();
+  gimbalPose.header.frame_id = "world";
+  gimbalPose.pose.pose.position.x = quad_state_.x[QS::POSX];
+  gimbalPose.pose.pose.position.y = quad_state_.x[QS::POSY];
+  gimbalPose.pose.pose.position.z = quad_state_.x[QS::POSZ];
+  Scalar yaw = quad_state_.euler_xyz().z();
+  Scalar yaw_hat = yaw + gimbalY_;
+  gimbalPose.pose.pose.orientation.w = std::cos(yaw_hat / 2);
+  gimbalPose.pose.pose.orientation.x = 0;
+  gimbalPose.pose.pose.orientation.y = 0;
+  gimbalPose.pose.pose.orientation.z = std::sin(yaw_hat / 2);
+  gimbalPose.twist.twist.angular.z = gimbalWz_;
+  gimbalPose_pub_.publish(gimbalPose);
+}
+
+void GimbalEnv::visualizeTarget() {
   nav_msgs::Odometry target;
   target.header.stamp = ros::Time::now();
   target.header.frame_id = "world";
@@ -477,32 +502,50 @@ void TrackEnv::visualizeTarget() {
   target_pub_.publish(target);
 }
 
-bool TrackEnv::getAct(Ref<Vector<>> act) const {
-  if (cmd_.t >= 0.0 && track_act_.allFinite()) {
-    act = track_act_;
+Matrix<3, 3> GimbalEnv::yawToR(Scalar yaw) {
+  Matrix<3, 3> rot;
+  rot << cos(yaw), -sin(yaw), 0,
+         sin(yaw), cos(yaw),  0,
+         0,        0,         1;
+  return rot;
+}
+
+bool GimbalEnv::isReach(Scalar theta) {
+  // return (std::abs(gimbal_obs_[gtenv::kDetect]) < 30.0 / 960.0) &&
+  //        (std::abs(gimbal_obs_[gtenv::kDetect + 1]) < 30.0 / 540.0) &&
+  //        (std::abs(gimbal_obs_[gtenv::kDetect + 2]) < 30.0 / 540.0) &&
+  //        theta > 0.95;  // std::cos(18.0 * M_PI / 180.0)
+  return (detect_bbox_.IoU(desired_bbox_) > 0.8) &&
+         theta > 0.95;  // std::cos(18.0 * M_PI / 180.0)
+}
+
+bool GimbalEnv::getAct(Ref<Vector<>> act) const {
+  if (cmd_.t >= 0.0 && gimbal_act_.allFinite()) {
+    act = gimbal_act_;
     return true;
   }
   return false;
 }
 
-bool TrackEnv::getAct(Command *const cmd) const {
+bool GimbalEnv::getAct(Command *const cmd) const {
   if (!cmd_.valid()) return false;
   *cmd = cmd_;
   return true;
 }
 
-void TrackEnv::addObjectsToUnity(std::shared_ptr<UnityBridge> bridge) {
+void GimbalEnv::addObjectsToUnity(std::shared_ptr<UnityBridge> bridge) {
   bridge->addQuadrotor(quadrotor_ptr_);
 }
 
-std::ostream &operator<<(std::ostream &os, const TrackEnv &track_env) {
+std::ostream &operator<<(std::ostream &os, const GimbalEnv &gimbal_env) {
   os.precision(3);
   os << "Tracking Environment:\n"
-     << "obs dim =            [" << track_env.obs_dim_ << "]\n"
-     << "act dim =            [" << track_env.act_dim_ << "]\n"
-     << "sim dt =             [" << track_env.sim_dt_ << "]\n"
-     << "max_t =              [" << track_env.max_t_ << "]\n"
-     << "act_std =            [" << track_env.act_std_.transpose() << std::endl;
+     << "obs dim =            [" << gimbal_env.obs_dim_ << "]\n"
+     << "act dim =            [" << gimbal_env.act_dim_ << "]\n"
+     << "sim dt =             [" << gimbal_env.sim_dt_ << "]\n"
+     << "max_t =              [" << gimbal_env.max_t_ << "]\n"
+     << "act_std =            [" << gimbal_env.act_std_.transpose()
+     << std::endl;
   os.precision();
   return os;
 }

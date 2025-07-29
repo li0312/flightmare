@@ -339,8 +339,8 @@ class PPO2(ActorCriticRLModel):
                     # Unpack
                     obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = runner.run()
                     # # add by Yunlong
-                    t_now = time.time()
-                    fps = int(self.n_batch / (t_now - t_start))
+                    # t_now = time.time()
+                    # fps = int(self.n_batch / (t_now - t_start))
 
                     self.ep_info_buf.extend(ep_infos)
                     mb_loss_vals = []
@@ -379,8 +379,8 @@ class PPO2(ActorCriticRLModel):
 
                     loss_vals = np.mean(mb_loss_vals, axis=0)
                     # # comment out by Yunlong
-                    # t_now = time.time()
-                    # fps = int(self.n_batch / (t_now - t_start))
+                    t_now = time.time()
+                    fps = int(self.n_batch / (t_now - t_start))
 
                     if writer is not None:
                         total_episode_reward_logger(self.episode_reward,

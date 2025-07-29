@@ -1,4 +1,4 @@
-track_env:
+gimbal_env:
    sim_dt: 0.05
    max_t: 15.0
    use_ros: 0

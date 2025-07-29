@@ -1,11 +1,4 @@
-'''
-Author: Lac_Creeper
-Date: 2025-06-24 14:23:27 +0800
-LastEditTime: 2025-07-08 22:51:53 +0800
-LastEditors: Lac_Creeper
-Description: 
-FilePath: /flightmare/flightrl/examples/track_control.py
-'''
+
 from ruamel.yaml import YAML, dump, RoundTripDumper
 import warnings
 warnings.filterwarnings("ignore", 
@@ -21,16 +14,13 @@ import tensorflow as tf
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 #
 from stable_baselines import logger
-
 #
-from stable_baselines.common.schedules import LinearSchedule
 from rpg_baselines.common.policies import FeedForwardPolicy
 from rpg_baselines.ppo.ppo2 import PPO2
 from rpg_baselines.envs import vec_env_wrapper as wrapper
 import rpg_baselines.common.util as U
 #
-from flightgym import TrackEnv_v1
-
+from flightgym import GimbalEnv_v1
 import rospy
 
 
@@ -38,13 +28,11 @@ def test_model(env, model):
     ep_num = 0
     while ep_num <= 0:
         obs, done, ep_len = env.reset(), False, 0
-        print(obs.dtype)
-        print(obs.shape)
         while not done:  # 双重检查
             act, _ = model.predict(obs, deterministic=True)
             obs, rew, done, _ = env.step(act)  # 明确忽略infos避免未使用变量警告
             ep_len += 1
-            if ep_len > 3200:
+            if ep_len > 5000:
                 break
         ep_num += 1
 
@@ -104,7 +92,7 @@ class TrackPolicy(FeedForwardPolicy):
         features = tf.layers.dense(
             combined,
             units=256,
-            activation=tf.nn.relu,
+            activation=tf.nn.sigmoid,
             name="final_fc"
         )  # shape=(batch, 128)
 
@@ -139,7 +127,7 @@ def main():
     if not args.train:
         cfg["env"]["num_envs"] = 1
         cfg["env"]["num_threads"] = 1
-        rospy.init_node("track_env_py", anonymous=True)
+        rospy.init_node("gimbal_env_py", anonymous=True)
 
         
     if args.render:
@@ -147,19 +135,22 @@ def main():
     else:
         cfg["env"]["render"] = "no"
 
-    env = wrapper.FlightEnvVec(TrackEnv_v1(
+    env = wrapper.FlightEnvVec(GimbalEnv_v1(
         dump(cfg, Dumper=RoundTripDumper), False))
 
     # set random seed
     configure_random_seed(args.seed, env=env)
 
-    lr_schedule = LinearSchedule(3e7, 3e-5, 3e-4)
+    def lr_schedule(frac):
+        init_rl = 3e-4
+        final_rl = 1e-5
+        return final_rl + frac * (init_rl - final_rl)
 
     #
     if args.train:
         # save the configuration and other files
         rsg_root = os.path.dirname(os.path.abspath(__file__))
-        log_dir = rsg_root + '/track_saved'
+        log_dir = rsg_root + '/gimbal_saved'
         saver = U.ConfigurationSaver(log_dir=log_dir)
         model = PPO2(
             tensorboard_log=saver.data_dir,
@@ -178,6 +169,7 @@ def main():
             nminibatches=1,
             noptepochs=10,
             cliprange=0.2,
+            # full_tensorboard_log=True,
             verbose=1,
         )
         # model = PPO2.load(log_dir + '/2025-06-26-16-59-23.zip', env=env, tensorboard_log=saver.data_dir)
@@ -193,7 +185,7 @@ def main():
         # 2000000000 is 4000 iterations.
         logger.configure(folder=saver.data_dir)
         model.learn(
-            total_timesteps=int(60000000),
+            total_timesteps=int(15000000),
             log_dir=saver.data_dir, logger=logger)
         model.save(saver.data_dir)
 

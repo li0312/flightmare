@@ -220,5 +220,6 @@ std::ostream& operator<<(std::ostream& os, const VecEnv<EnvBase>& env) {
 template class VecEnv<QuadrotorEnv>;
 template class VecEnv<TrackEnv>;
 template class VecEnv<ObstacleEnv>;
+template class VecEnv<GimbalEnv>;
 
 }  // namespace flightlib

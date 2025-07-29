@@ -1,9 +1,9 @@
-/*** 
+/***
  * @Author: Flightmare
  * @Date: 2025-05-19 22:37:29 +0800
- * @LastEditTime: 2025-06-16 14:37:29 +0800
+ * @LastEditTime: 2025-07-01 16:35:50 +0800
  * @LastEditors: Lac_Creeper
- * @Description: 
+ * @Description:
  * @FilePath: /flightmare/flightlib/src/wrapper/pybind_wrapper.cpp
  */
 
@@ -14,9 +14,10 @@
 
 // flightlib
 #include "flightlib/envs/env_base.hpp"
+#include "flightlib/envs/gimbal_env/gimbal_env.hpp"
 #include "flightlib/envs/quadrotor_env/quadrotor_env.hpp"
-#include "flightlib/envs/track_env/track_env.hpp"
 #include "flightlib/envs/test_env.hpp"
+#include "flightlib/envs/track_env/track_env.hpp"
 #include "flightlib/envs/vec_env.hpp"
 
 namespace py = pybind11;
@@ -47,7 +48,8 @@ PYBIND11_MODULE(flightgym, m) {
   // py::class_<TestEnv<QuadrotorEnv>>(m, "TestEnv_v0")
   //   .def(py::init<>())
   //   .def("reset", &TestEnv<QuadrotorEnv>::reset)
-  //   .def("__repr__", [](const TestEnv<QuadrotorEnv>& a) { return "Test Env"; });
+  //   .def("__repr__", [](const TestEnv<QuadrotorEnv>& a) { return "Test Env";
+  //   });
 
   py::class_<VecEnv<TrackEnv>>(m, "TrackEnv_v1")
     .def(py::init<>())
@@ -88,6 +90,27 @@ PYBIND11_MODULE(flightgym, m) {
     .def("getActDim", &VecEnv<ObstacleEnv>::getActDim)
     .def("getExtraInfoNames", &VecEnv<ObstacleEnv>::getExtraInfoNames)
     .def("__repr__", [](const VecEnv<ObstacleEnv>& a) {
+      return "RPG Drone Tracking Environment";
+    });
+
+  py::class_<VecEnv<GimbalEnv>>(m, "GimbalEnv_v1")
+    .def(py::init<>())
+    .def(py::init<const std::string&>())
+    .def(py::init<const std::string&, const bool>())
+    .def("reset", &VecEnv<GimbalEnv>::reset)
+    .def("step", &VecEnv<GimbalEnv>::step)
+    .def("testStep", &VecEnv<GimbalEnv>::testStep)
+    .def("setSeed", &VecEnv<GimbalEnv>::setSeed)
+    .def("close", &VecEnv<GimbalEnv>::close)
+    .def("isTerminalState", &VecEnv<GimbalEnv>::isTerminalState)
+    .def("curriculumUpdate", &VecEnv<GimbalEnv>::curriculumUpdate)
+    .def("connectUnity", &VecEnv<GimbalEnv>::connectUnity)
+    .def("disconnectUnity", &VecEnv<GimbalEnv>::disconnectUnity)
+    .def("getNumOfEnvs", &VecEnv<GimbalEnv>::getNumOfEnvs)
+    .def("getObsDim", &VecEnv<GimbalEnv>::getObsDim)
+    .def("getActDim", &VecEnv<GimbalEnv>::getActDim)
+    .def("getExtraInfoNames", &VecEnv<GimbalEnv>::getExtraInfoNames)
+    .def("__repr__", [](const VecEnv<GimbalEnv>& a) {
       return "RPG Drone Tracking Environment";
     });
 }

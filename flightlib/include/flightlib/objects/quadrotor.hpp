@@ -29,6 +29,9 @@ class Quadrotor : ObjectBase {
   void init(void);
 
   // run the quadrotor
+  // bool PositionControl(const Command& cmd, const Scalar ctl_dt);
+  bool simpleVelControlBody(const Command& cmd, const Scalar ctl_dt);
+  bool simpleVelControl(const Command& cmd, const Scalar ctl_dt);
   bool velocityControlBody(const Command &cmd, const Scalar ctl_dt);
   bool velocityControl(const Command& cmd, const Scalar ctl_dt);
   bool run(const Scalar dt) override;

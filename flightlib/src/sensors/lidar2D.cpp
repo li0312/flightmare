@@ -309,10 +309,14 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
                                               mapBounds_.max().x() / 2);
   std::uniform_real_distribution<Scalar> posY(-mapBounds_.max().y() / 2,
                                               mapBounds_.max().y() / 2);
-  std::uniform_real_distribution<Scalar> size(0.3, 0.6);
+  std::uniform_real_distribution<Scalar> size(0.3, 1.0);
   std::uniform_real_distribution<Scalar> angle(0, M_PI);
 
+  auto safeArea = 
+    std::make_shared<Rectangle>(Vector<2>{0.0, 0.0}, 5, 5, 0);
+
   // 添加随机矩形
+  logger_map_ << "Generate rectangles: " << numRectangles << std::endl;
   for (int i = 0; i < numRectangles; ++i) {
     bool is_placed = false;
     for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
@@ -320,10 +324,15 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
       Scalar cy = posY(gen);
       Scalar width = size(gen);
       Scalar height = size(gen);
-      Scalar yaw = angle(gen);
+      // Scalar yaw = angle(gen);
+      Scalar yaw = 0.0;
       auto rect =
         std::make_shared<Rectangle>(Vector<2>{cx, cy}, width, height, yaw);
       bool collision = false;
+      if (rect->getBBox().intersects(safeArea->getBBox())) {
+        collision = true;
+        break;
+      }
       for (const auto& existing : obstacles_) {
         if (rect->getBBox().intersects(existing->getBBox())) {
           collision = true;
@@ -334,6 +343,11 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
         obstacles_.push_back(rect);
         treeBuilt_ = false;  // 需要重建树
         is_placed = true;
+        logger_map_ << cx << " "
+                    << cy << " "
+                    << width << " "
+                    << height << " "
+                    << yaw << std::endl;
         break;
       }
     }
@@ -341,6 +355,7 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
   }
 
   // 添加随机椭圆
+  logger_map_ << "Generate ellipses: " << numEllipses << std::endl;
   for (int i = 0; i < numEllipses; ++i) {
     bool is_placed = false;
     for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
@@ -349,9 +364,14 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
       Scalar a = size(gen);
       Scalar b = size(gen);
       if (b > a) std::swap(a, b);  // 确保a是长轴
-      Scalar yaw = angle(gen);
+      // Scalar yaw = angle(gen);
+      Scalar yaw = 0.0;
       auto ellipse = std::make_shared<Ellipse>(Vector<2>{cx, cy}, a, b, yaw);
       bool collision = false;
+      if (ellipse->getBBox().intersects(safeArea->getBBox())) {
+        collision = true;
+        break;
+      }
       for (const auto& existing : obstacles_) {
         if (ellipse->getBBox().intersects(existing->getBBox())) {
           collision = true;
@@ -362,6 +382,11 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
         obstacles_.push_back(ellipse);
         treeBuilt_ = false;  // 需要重建树
         is_placed = true;
+        logger_map_ << cx << " " 
+                    << cy << " "
+                    << a << " "
+                    << b << " "
+                    << yaw << std::endl;
         break;
       }
     }
@@ -370,6 +395,68 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
 
   // buildTree();
 }
+
+
+void Lidar2D::loadMap(const std::string &filename) {
+  // reset
+  obstacles_.clear();
+
+  std::ifstream file(filename);
+  if (!file) {
+    logger_.warn("Could not open file %s.", filename.c_str());
+    return;
+  }
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.empty()) continue;
+    if (line.find("rectangles:") != std::string::npos) {
+      int count = std::stoi(line.substr(line.find(':') + 1));
+      for (int i = 0; i < count && std::getline(file, line); ++i) {
+        bool is_placed = false;
+        std::stringstream ss(line);
+        Scalar cx, cy, w, h, yaw;
+        if (ss >> cx >> cy >> w >> h >> yaw) {
+          auto rect =
+            std::make_shared<Rectangle>(Vector<2>{cx, cy}, w, h, yaw);
+          obstacles_.push_back(rect);
+          is_placed = true;
+          // bool collision = false;
+          // for (const auto& existing : obstacles_) {
+          //   if (rect->getBBox().intersects(existing->getBBox())) {
+          //     collision = true;
+          //     break;
+          //   }
+          // }
+          // if (!collision) {
+          //   obstacles_.push_back(rect);
+          //   treeBuilt_ = false;  // 需要重建树
+          //   is_placed = true;
+          //   break;
+          // }
+        }
+        if (!is_placed) logger_.warn("无法放置长方体: %d", i);
+      }
+    }
+
+    if (line.find("ellipses:") != std::string::npos) {
+      int count = std::stoi(line.substr(line.find(':') + 1));
+      for (int i = 0; i < count && std::getline(file, line); ++i) {
+        bool is_placed = false;
+        std::stringstream ss(line);
+        Scalar cx, cy, a, b, yaw;
+        if (ss >> cx >> cy >> a >> b >> yaw) {
+          auto ellipse = 
+            std::make_shared<Ellipse>(Vector<2>{cx, cy}, a, b, yaw);
+            obstacles_.push_back(ellipse);
+            is_placed = true;
+        }
+        if (!is_placed) logger_.warn("无法放置圆柱体: %d", i);
+      }
+    }
+
+  }
+}
+
 
 bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
                             std::vector<Scalar>& ranges, Scalar safeRange,
@@ -423,7 +510,8 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
   if (is_norm) {
     for (int i = 0; i < numRays_; ++i) {
       // ranges[i] = ranges[i] / maxRange_ - 0.5;
-      ranges[i] = exp(-ranges[i]);
+      // ranges[i] = exp(-2.5 * ranges[i]);
+      ranges[i] = exp(-1.0 * ranges[i]);
     }
   }
   return is_collision;

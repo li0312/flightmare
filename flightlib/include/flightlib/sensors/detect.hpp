@@ -27,7 +27,8 @@ struct BBox {
     Vector<3> norm_cp;
     norm_cp.x() = ((u_min + u_max) / 2.0 - 480.0) / 960.0;
     norm_cp.y() = ((v_min + v_max) / 2.0 - 260.0) / 540.0;
-    norm_cp.z() = (v_max - v_min - 201.0) / 540.0;
+    // norm_cp.z() = (v_max - v_min - 201.0) / 540.0;  // For fov_69
+    norm_cp.z() = (v_max - v_min - 210.0) / 540.0;  // For fov_108
 
     return norm_cp;
   }

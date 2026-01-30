@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-15 13:06:03 +0800
- * @LastEditTime: 2025-06-25 16:06:19 +0800
+ * @LastEditTime: 2026-01-18 00:02:19 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /flightmare/flightros/src/lac_test/vel_control_test.cpp
+ * @FilePath: /src/flightmare/flightros/src/lac_test/vel_control_test.cpp
  */
 
 // ros
@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
   ros::Publisher cloud_pub;
   ros::Publisher map_pub;
   ros::Publisher scan_pub;
+  ros::Publisher body_vel_pub;
 
 
   // subscriber
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
   QuadrotorDynamics dynamics;
   dynamics.updateParams(cfg_);
   quad_ptr->updateDynamics(dynamics);
+  std::cout << dynamics << std::endl;
   // define quadsize scale (for unity visualization only)
   // Vector<3> quad_size(0.5, 0.5, 0.5);
   // quad_ptr->setSize(quad_size);
@@ -106,6 +108,7 @@ int main(int argc, char *argv[]) {
   cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("local_pointcloud", 1);
   map_pub = nh.advertise<sensor_msgs::PointCloud2>("global_map", 1);
   scan_pub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
+  body_vel_pub = nh.advertise<nav_msgs::Odometry>("body_vel", 1);
 
 
   // Flightmare
@@ -124,8 +127,8 @@ int main(int argc, char *argv[]) {
   // initialization
   quad_state.setZero();
 
-  quad_state.x(QS::POSX) = 5;
-  quad_state.x(QS::POSY) = 5;
+  quad_state.x(QS::POSX) = 0;
+  quad_state.x(QS::POSY) = 0;
   quad_state.x(QS::POSZ) = 0.8;
   // quad_state.x(QS::ATTW) = std::cos(5.0/180*M_PI);
   // quad_state.x(QS::ATTX) = 0.0;
@@ -190,7 +193,12 @@ int main(int argc, char *argv[]) {
   std::mt19937 random_gen_{rd_()};
   std::uniform_real_distribution<Scalar> uniform_dist_{-1.0, 1.0};
   int step = 0;
-  int epoch = 100;
+  int epoch = 1000;
+  Scalar max_a = 0.0;
+  Vector<2> vel(0.0, 0.0);
+  Vector<2> last_vel(0.0, 0.0);
+  Scalar last_vx = 0.0;
+  Scalar last_vy = 0.0;
 
 
   while (ros::ok() && unity_ready) {
@@ -200,6 +208,7 @@ int main(int argc, char *argv[]) {
     // Control by velocity control
     step += 1;
     int mod = (step % epoch);
+    mod = 1;
     if (mod == 0) {
       quad_state.setZero();
       Scalar init_x = uniform_dist_(random_gen_) * 5.0f;
@@ -218,6 +227,13 @@ int main(int argc, char *argv[]) {
       cmd.t = 0;
       cmd.linear.setZero();
       cmd.angular.setZero();
+    } else {
+      quad_state.setZero();
+      quad_state.x(QS::POSZ) = 0.8;
+      quad_ptr->reset(quad_state);
+      cmd.t = 0;
+      cmd.linear.setZero();
+      cmd.angular.setZero();
     }
     
     time_last = time_now;
@@ -225,43 +241,60 @@ int main(int argc, char *argv[]) {
     Scalar dt = (time_now - time_last).toSec();
     dt = 0.05;
     cmd.t += dt;
-    cmd.linear.x() = uniform_dist_(random_gen_);
-    cmd.angular.z() = uniform_dist_(random_gen_);
+    // if (frame_id % 20 == 0) {
+    //   cmd.linear.x() = uniform_dist_(random_gen_) * 2.0;
+    //   cmd.linear.x() = uniform_dist_(random_gen_) * 2.0;
+    //   cmd.angular.z() = uniform_dist_(random_gen_) * 0.5;
+    // }
+    // cmd.linear.x() = uniform_dist_(random_gen_);
+    // cmd.linear.x() = uniform_dist_(random_gen_);
+    // cmd.angular.z() = uniform_dist_(random_gen_);
+
     // if (cmd.t < 15) {
-    //   cmd.linear.x() = 2.0;
+    //   cmd.linear.x() = 4.0;
     //   cmd.angular.z() = 0.5;
     // } else if (cmd.t < 25) {
-    //   cmd.linear.x() = 0.0;
-    //   cmd.linear.y() = 1.0;
+    //   cmd.linear.x() = 2.5;
+    //   cmd.linear.y() = 2.5;
     //   cmd.angular.z() = 0.0;
     // } else if (cmd.t < 45){
     //   cmd.linear.x() = -2.0;
     //   cmd.linear.y() = 0.0;
-    //   cmd.angular.z() = 0.0;
+    //   cmd.angular.z() = -0.5;
     // } else{
     //   cmd.linear.setZero();
     //   cmd.angular.setZero();
     // }
-    // cmd.linear.x() = 2.0;
-    // cmd.angular.z() = 0.5;
+
+    // cmd.linear.x() = 0.0;
+    // cmd.linear.y() = 0.0;
+    // cmd.angular.z() = 0.0;
     // timer.tic();
 
 
-    quad_ptr->velocityControlBody(cmd, dt);
+    // quad_ptr->simpleVelControlBody(cmd, dt);
+    // quad_ptr->velocityControlBody(cmd, dt);
     // timer.toc();
     // std::cout << timer << std::endl;
     // DEBUG:
 
     quad_ptr->getState(&state4test);
-    logger.info("time: %.2f", state4test.t);
+    // logger.info("time: %.2f", state4test.t);
+    // std::cout << "Yaw: " << state4test.euler_xyz().transpose() << std::endl;
+    // std::cout << "Yaw: "
+    //           << state4test.q().toRotationMatrix().eulerAngles(2, 1, 0).transpose()
+    //           << std::endl;
+    // logger.info("Yaw: %.2f", state4test.euler_xyz().transpose());
 
     timer.tic();
     BBox result_bbox;
-    Vector<3> target_xyY = {6.0, 0.0, 0.0};
+    Vector<3> target_xyY = {20.0, 0.0, 0.0};
     detect_test.updateTarget(target_xyY);
     bool is_valid = detect_test.getBBox(state4test, result_bbox);
     // std::cout << result_bbox << std::endl;
     // logger.debug("is_valid: %d", is_valid);
+    // logger.info("[POS]: %.2f, %.2f, %.2f", state4test.p.x(), state4test.p.y(),  state4test.p.z());
+    std::cout << result_bbox << std::endl;
     // logger.debug("bbox: %d, %d, %d, %d", result_bbox.u_min, result_bbox.u_max,
     //              result_bbox.v_min, result_bbox.v_max);
 
@@ -287,17 +320,30 @@ int main(int argc, char *argv[]) {
       scan_pub.publish(scan_msg);
     }
     
-    std::cout << state4test << std::endl;
+    // std::cout << state4test << std::endl;
     Vector<2> test_vector = Vector<2>{3.0, 4.0};
     Vector<2> test_vector_norm = test_vector.normalized();
-    std::cout << "test vector:" << test_vector << std::endl;
-    std::cout << "test norm:" << test_vector_norm << std::endl;
+    // std::cout << "test vector:" << test_vector << std::endl;
+    // std::cout << "test norm:" << test_vector_norm << std::endl;
     Vector<3> euler_xyz = state4test.euler_xyz();
     Scalar yaw = euler_xyz.z();
     Scalar body_vel_x =
       cos(yaw) * state4test.v.x() + sin(yaw) * state4test.v.y();
     Scalar body_vel_y =
       -sin(yaw) * state4test.v.x() + cos(yaw) * state4test.v.y();
+    Scalar acc = (Vector<2>(body_vel_x, body_vel_y) - 
+                  Vector<2>(last_vx, last_vy)).norm() / dt;
+    if (acc > max_a) {
+      max_a = acc;
+      vel = Vector<2>(body_vel_x, body_vel_y);
+      last_vel = Vector<2>(last_vx, last_vy);
+    }
+    // logger.debug("max_a: %.2f", max_a);
+    // logger.debug("vel: [%.4f, %.4f]", vel(0), vel(1));
+    // logger.debug("last_vel: [%.4f, %.4f]", last_vel(0), last_vel(1));
+    last_vx = body_vel_x;
+    last_vy = body_vel_y;
+    
     // Vector<3> pose(state4test.p);
     // Matrix<3, 3> rot(state4test.q());
     // std::cout << rot << std::endl;
@@ -305,17 +351,23 @@ int main(int argc, char *argv[]) {
     // std::cout << pose << std::endl;
     // std::cout << pose[0] << std::endl;
     // std::cout << pose(0) << std::endl;
-    logger.debug("dt: %.2f", dt);
-    logger.debug("pose: %.2f, %.2f, %.2f", state4test.p.x(), state4test.p.y(),
-                 state4test.p.z());
-    logger.debug("body_v: %.5f, %.5f", body_vel_x, body_vel_y);
-    logger.debug("world_v: %.2f, %.2f, %.2f", state4test.v.x(), 
-                 state4test.v.y(), state4test.w.z());
+    // logger.debug("dt: %.2f", dt);
+    // logger.debug("pose: %.2f, %.2f, %.2f", state4test.p.x(), state4test.p.y(),
+    //              state4test.p.z());
+    // logger.debug("body_v: %.5f, %.5f", body_vel_x, body_vel_y);
+    // logger.debug("world_v: %.2f, %.2f, %.2f", state4test.v.x(), 
+    //              state4test.v.y(), state4test.w.z());
     // std::cout << "[VEL]" << state4test.x(QS::VELX) << state4test.x(QS::VELY)
     //           << state4test.x(QS::VELZ) << state4test.x(QS::OMEZ) << std::endl;
+    if (rviz_visual) {
+      odom_msg.twist.twist.linear.x = body_vel_x;
+      odom_msg.twist.twist.linear.y = body_vel_y;
+      body_vel_pub.publish(odom_msg);
+    }
 
     timer_1.toc();
-    std::cout << timer_1 << std::endl;
+    // std::cout << timer << std::endl;
+    // std::cout << timer_1 << std::endl;
 
     unity_bridge_ptr->getRender(frame_id);
     unity_bridge_ptr->handleOutput();

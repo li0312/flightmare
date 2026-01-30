@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:38:23 +0800
- * @LastEditTime: 2025-07-02 15:37:38 +0800
+ * @LastEditTime: 2026-01-18 00:04:01 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /flightmare/flightlib/src/sensors/detect.cpp
+ * @FilePath: /src/flightmare/flightlib/src/sensors/detect.cpp
  */
 #include "flightlib/sensors/detect.hpp"
 
@@ -13,7 +13,7 @@ namespace flightlib {
 DetectSim::DetectSim()
   : width_(960),
     height_(540),
-    fov_{69.0/180.0*M_PI} {
+    fov_{108.0/180.0*M_PI} {
 
   Scalar focal_length = width_/(2*tan(fov_/2));
   K_ << focal_length, 0,            width_/2,
@@ -54,6 +54,7 @@ bool DetectSim::getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB,
     int v = (int)(pixel_homo.y() / pixel_homo.z());
 
     projected_points.emplace_back(u, v);
+    // logger_.debug("[UV]: %d, %d", u, v);
     }
 
   if (projected_points.empty()) {
@@ -75,7 +76,7 @@ bool DetectSim::getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB,
   v_min = std::clamp(v_min, 0, height_);
   v_max = std::clamp(v_max, 0, height_);
 
-  bool is_valid = (u_max > u_min) && (v_max > (v_min + 20));
+  bool is_valid = (u_max >= u_min) && (v_max >= (v_min + 30));
   if (is_valid) {
     out_bbox = {u_min, v_min, u_max, v_max};
   } else {
@@ -112,22 +113,18 @@ void DetectSim::updateTarget(const Ref<Vector<3>> target_xyY) {
          0,            0,            1;
   
   target_cube_.clear();
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() - 0.1f, target_xyY_.y() - 0.25f, 0.0f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() - 0.1f, target_xyY_.y() + 0.25f, 0.0f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() + 0.1f, target_xyY_.y() - 0.25f, 0.0f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() + 0.1f, target_xyY_.y() + 0.25f, 0.0f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() - 0.1f, target_xyY_.y() - 0.25f, 1.7f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() - 0.1f, target_xyY_.y() + 0.25f, 1.7f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() + 0.1f, target_xyY_.y() - 0.25f, 1.7f});
-  target_cube_.emplace_back(
-    rot * Vector<3>{target_xyY_.x() + 0.1f, target_xyY_.y() + 0.25f, 1.7f});
+  Vector<3> target_top{target_xyY_.x(), target_xyY_.y(), 0.0f};
+  Vector<3> target_bottom{target_xyY_.x(), target_xyY_.y(), 1.7f};
+  // target_cube_.emplace_back(target_top);
+  // target_cube_.emplace_back(target_bottom);
+  target_cube_.emplace_back(target_top + rot * Vector<3>{-0.1f, -0.25f, 0.0f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{-0.1f, 0.25f, 0.0f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{0.1f, -0.25f, 0.0f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{0.1f, 0.25f, 0.0f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{-0.1f, -0.25f, 1.7f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{-0.1f, 0.25f, 1.7f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{0.1f, -0.25f, 1.7f});
+  target_cube_.emplace_back(target_top + rot * Vector<3>{0.1f, 0.25f, 1.7f});
 }
 
 

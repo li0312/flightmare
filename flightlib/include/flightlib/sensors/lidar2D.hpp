@@ -114,6 +114,7 @@ class Lidar2D {
   bool treeBuilt_ = false;
 
   Logger logger_{"lidar2d"};
+  Logger logger_map_{"", std::string("/home/lac/fm_test/my_logs/random_map.log")};
 
   /// Lidar parameters
   Scalar fov_;
@@ -136,6 +137,8 @@ class Lidar2D {
   // 生成随机地图
   void generateRandomMap(int numRectangles, int numEllipses,
                          int MAX_ATTEMPTS = 100);
+  
+  void loadMap(const std::string &filename);
 
   // 高效的激光雷达模拟
   bool simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,

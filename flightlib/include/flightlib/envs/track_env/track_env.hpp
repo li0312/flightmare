@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 #include <sensor_msgs/LaserScan.h>
@@ -100,6 +102,11 @@ class TrackEnv final : public EnvBase {
   ros::Publisher odom_pub_;
   ros::Publisher scan_pub_;
   ros::Publisher target_pub_;
+  ros::Publisher debug_pub_;
+
+  Scalar target_maxV_;
+  Scalar target_V_;
+  Scalar tMaxV_;
 
 
   // quadrotor
@@ -107,7 +114,7 @@ class TrackEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 40, 2 * M_PI, 512, 10.0, 0.4};
+  Lidar2D lidar_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
   DetectSim detect_;
   Logger logger_{"TrackEnv"};
 
@@ -115,8 +122,9 @@ class TrackEnv final : public EnvBase {
   int reach_count_;
 
   // Define reward for training
-  Scalar detect_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
-  int use_ros_;
+  Scalar detect_coeff_, dist_coeff_, alpha_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
+  int use_ros_, fine_turn_, random_;
+  Scalar traj_param_;
   Vector<3> targetInitPose_;
   Scalar last_alpha_, last_dist_, last_theta_;
   bool has_init_reward_;

@@ -1,10 +1,10 @@
 /*** 
  * @Author: Flightmare
  * @Date: 2024-11-27 17:32:59 +0800
- * @LastEditTime: 2025-05-20 20:37:09 +0800
+ * @LastEditTime: 2025-09-25 22:25:51 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /flightmare/flightlib/src/common/quad_state.cpp
+ * @FilePath: /src/flightmare/flightlib/src/common/quad_state.cpp
  */
 #include "flightlib/common/quad_state.hpp"
 

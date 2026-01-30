@@ -99,10 +99,12 @@
       </node>
     </group>
 
-    <node pkg="flightros" type="flight_pilot_node" name="flight_pilot_node" output="screen">
+    <node pkg="flightros" type="fast_wrapper_node" name="fast_wrapper_node" output="screen">
       <rosparam file="$(find flightros)/params/default.yaml" />
-      <remap from="flight_pilot/state_estimate" to="ground_truth/odometry" />
+      <!-- <remap from="/visual_slam/odom" to="ground_truth/odometry" /> -->
     </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find flightros)/launch/fast_wrapper/fast.rviz" required="true" />
 
     <node pkg="joy" type="joy_node" name="joy_node">
       <param name="autorepeat_rate" value="10"/>

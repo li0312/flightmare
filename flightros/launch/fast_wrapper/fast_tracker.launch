@@ -1,0 +1,146 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="map_size_x_" value="150.0"/>
+  <arg name="map_size_y_" value="140.0"/>
+  <arg name="map_size_z_" value="8.0"/>
+  <arg name="quad_name" default="hummingbird"/>
+  <arg name="mav_name" default="$(arg quad_name)"/>
+  <arg name="use_unity_editor" default="false" />
+  <!-- <param name="use_sim_time" value="true"/> -->
+
+  <!-- RPG Flightmare Unity Render. -->
+  <!-- <node pkg="flightrender" type="RPG_Flightmare.x86_64" name="rpg_flightmare_render" unless="$(arg use_unity_editor)">
+  </node> -->
+
+  <node pkg="flightros" type="fast_wrapper_node" name="fast_wrapper_node" output="screen">
+    <rosparam file="$(find flightros)/params/default.yaml" />
+    <remap from="local_cloud" to="/pcl_render_node/cloud"/>
+  </node>
+
+  <node pkg="plan_manage" type="tracking_fsm_node" name="tracking_fsm_node" output="screen">
+      <remap from="~target"       to = "/target"/>
+      <remap from="~odom"            to="/visual_slam/odom"/>
+      <remap from="~trajectory"     to=  "/trajectory" />
+      <remap from="/grid_map/odom" to="/visual_slam/odom"/>
+      <remap from="/grid_map/cloud" to="/pcl_render_node/cloud"/>
+      <remap from = "/grid_map/pose"   to = "/pcl_render_node/camera_pose"/> 
+      <remap from = "/grid_map/depth" to = "/pcl_render_node/depth"/>
+      <param name="traj/vmax"  value = "2.5"/>
+      <param name="traj/amax"  value = "3.5"/>
+      <!-- kino search -->
+      <param name="search/max_tau"  value = "0.3"/>
+      <param name="search/init_max_tau" value = "0.8"/>
+      <param name="search/max_vel"  value = "3.0" />
+      <param name="search/max_acc"  value = "4.0"/>
+      <param name="search/w_time"  value = "1.0"/>
+      <param name="search/lambda_heu" value = "10.0"/>
+      <param name="search/check_num"  value = "10"/>   
+      <param name="search/weight_heu_time"  value = "10000"/>   
+      <!-- sensing part -->
+      <param name="grid_map/resolution"      value="0.1" /> 
+      <param name="grid_map/map_size_x"   value="$(arg map_size_x_)" /> 
+      <param name="grid_map/map_size_y"   value="$(arg map_size_y_)" /> 
+      <param name="grid_map/map_size_z"   value="$(arg map_size_z_)" /> 
+      <param name="grid_map/local_update_range_x"  value="5.0" /> 
+      <param name="grid_map/local_update_range_y"  value="5.0" /> 
+      <param name="grid_map/local_update_range_z"  value="5.0" /> 
+      <param name="grid_map/obstacles_inflation"     value="0.12" /> 
+      <!-- <param name="grid_map/obstacles_inflation"     value="0.099" />  -->
+      <param name="grid_map/local_map_margin" value="30"/>
+      <param name="grid_map/ground_height"        value="-0.01"/>
+      <!-- camera parameter -->
+      <param name="grid_map/cx" value="319.3750915527344"/>
+      <param name="grid_map/cy" value="241.12332153320312"/>
+      <param name="grid_map/fx" value="385.2784729003906"/>
+      <param name="grid_map/fy" value="385.2784729003906"/>
+      <!-- depth filter -->
+      <param name="grid_map/use_depth_filter" value="true"/>
+      <param name="grid_map/depth_filter_tolerance" value="0.15"/>
+      <param name="grid_map/depth_filter_maxdist"   value="5.0"/>
+      <param name="grid_map/depth_filter_mindist"   value="0.2"/>
+      <param name="grid_map/depth_filter_margin"    value="2"/>
+      <param name="grid_map/k_depth_scaling_factor" value="1000.0"/>
+      <param name="grid_map/skip_pixel" value="2"/>
+      <!-- local fusion -->
+      <param name="grid_map/p_hit"  value="0.65"/>
+      <param name="grid_map/p_miss" value="0.35"/>
+      <param name="grid_map/p_min"  value="0.12"/>
+      <param name="grid_map/p_max"  value="0.90"/>
+      <param name="grid_map/p_occ"  value="0.80"/>
+      <param name="grid_map/min_ray_length" value="0.1"/>
+      <param name="grid_map/max_ray_length" value="4.5"/>
+
+      <param name="grid_map/virtual_ceil_height"   value="2.5"/>
+      <param name="grid_map/visualization_truncate_height"   value="2.4"/>
+      <param name="grid_map/show_occ_time"  value="false"/>
+      <param name="grid_map/pose_type"     value="1"/>  
+      <param name="grid_map/frame_id"      value="world"/>
+
+    </node>
+
+
+    <node pkg="traj_server" type="traj_server_node" name="traj_server" output="screen" launch-prefix="">
+        <remap from="~/position_command" to="/position_cmd"/>
+        <!-- <remap from="~/odometry" to="/vins_estimator/imu_propagate"/> -->
+        <remap from="~/odometry"      to="/visual_slam/odom"/>
+        <remap from="~/trajectory" to="/trajectory"/>
+        <remap from="~/desired_position" to="/position_cmd"/>
+        <remap from="~front_pos_forpredict"     to=  "/drone_node/front_pos_forpredict" />
+	  </node>
+
+  <node pkg="target_detection" type="sim_detect_node" name="sim_detect_node" output="screen">
+      <remap from="~car_state_detect"       to = "/car_state"/>
+      <remap from="~global_map"       to = "/global_map"/>
+      <remap from="~drone_odom"       to = "/visual_slam/odom"/>
+      <remap from="~target"       to = "/target"/>
+
+      <param name="grid_map/resolution"      value="0.1" /> 
+      <param name="grid_map/map_size_x"   value="$(arg map_size_x_)" /> 
+      <param name="grid_map/map_size_y"   value="$(arg map_size_y_)" /> 
+      <param name="grid_map/map_size_z"   value="$(arg map_size_z_)" /> 
+    </node>
+
+  <node pkg="odom_visualization" name="quad0_odom_visualization" type="odom_visualization"
+          output="screen">
+        <remap from="~odom" to="/visual_slam/odom"/>
+        <remap from="~cmd" to="pos_cmd"/>
+        <param name="init_x" value="0"/>
+        <param name="init_y" value="0"/>
+        <param name="init_z" value="0"/>
+        <param name="color/a" value="1.0"/>
+        <param name="color/r" value="0.0"/>
+        <param name="color/g" value="0.0"/>
+        <param name="color/b" value="1.0"/>
+        <param name="covariance_scale" value="100.0"/>
+        <param name="robot_scale" value="1.0"/>
+        <param name="quadrotor_name" value="quad0"/>
+        <param name="drone_id" value="0"/>
+        <param name="mesh_resource" value="package://odom_visualization/meshes/hummingbird.mesh"/>
+    </node>
+
+    <node pkg="odom_visualization" name="target_odom_visualization" type="odom_visualization"
+          output="screen">
+        <remap from="~odom" to="targetGT"/>
+        <remap from="~cmd" to="target_pos_cmd"/>
+        <param name="init_x" value="0"/>
+        <param name="init_y" value="0"/>
+        <param name="init_z" value="0"/>
+        <param name="color/a" value="0.8"/>
+        <param name="color/r" value="0.0"/>
+        <param name="color/g" value="1.0"/>
+        <param name="color/b" value="0.0"/>
+        <param name="covariance_scale" value="100.0"/>
+        <param name="robot_scale" value="0.35"/>
+        <param name="quadrotor_name" value="target"/>
+        <param name="drone_id" value="0"/>
+        <param name="mesh_resource" value="package://odom_visualization/meshes/spide_man.dae"/>
+    </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find flightros)/launch/fast_wrapper/fast.rviz" required="true" />
+
+  <!-- <node name="rviz_fast" pkg="rviz" type="rviz" args="-d $(find plan_manage)/rviz/default.rviz" required="true" /> -->
+
+  <include file="$(find plan_manage)/launch/lac_simulator.xml"/>
+
+
+</launch>

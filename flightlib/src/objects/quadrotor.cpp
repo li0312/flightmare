@@ -29,6 +29,81 @@ Quadrotor::Quadrotor(const QuadrotorDynamics &dynamics)
 Quadrotor::~Quadrotor() {}
 
 
+// bool Quadrotor::PositionControl(const Command &cmd, )
+
+bool Quadrotor::simpleVelControlBody(const Command &cmd, const Scalar ctl_dt) {
+  if (!cmd.isVelocity()) return false;
+  if (!state_.valid()) return false;
+
+  Scalar YAW_GAIN = 0.73;
+  Vector<3> euler_xyz = state_.euler_xyz();
+  Scalar yaw_hat = euler_xyz.z() + cmd.angular.z() * YAW_GAIN;
+  Matrix<3, 3> rot;
+  rot << cos(yaw_hat), -sin(yaw_hat), 0, sin(yaw_hat), cos(yaw_hat), 0, 0, 0, 1;
+
+  Command command;
+  command.t = cmd.t;
+  command.linear = rot * cmd.linear;
+  command.angular = cmd.angular;
+
+  return velocityControl(command, ctl_dt);
+}
+
+bool Quadrotor::simpleVelControl(const Command &cmd, const Scalar ctl_dt) {
+  // return run_simple_v(ctl_dt);
+  if (!state_.valid()) return false;
+  if (!cmd.valid()) return false;
+
+  QuadState old_state = state_;
+  QuadState next_state = state_;
+
+  Vector<3> vel_cmd;
+  vel_cmd.x() = cmd.linear.x();
+  vel_cmd.y() = cmd.linear.y();
+  vel_cmd.z() = cmd.angular.z();
+
+  // time
+  const Scalar max_dt = integrator_ptr_->dtMax();
+  Scalar remain_ctl_dt = ctl_dt;
+
+  // simulation loop
+  while (remain_ctl_dt > 0.0) {
+    const Scalar sim_dt = std::min(remain_ctl_dt, max_dt);
+
+    state_.a.setZero();
+    state_.tau.setZero();
+    if (vel_cmd(0) >= state_.v(0)) {
+      state_.a(0) = std::min(vel_cmd(0) - state_.v(0), static_cast<Scalar>(4));
+    } else {
+      state_.a(0) = std::max(vel_cmd(0) - state_.v(0), static_cast<Scalar>(-4));
+    }
+    if (vel_cmd(1) >= state_.v(1)) {
+      state_.a(1) = std::min(vel_cmd(1) - state_.v(1), static_cast<Scalar>(4));
+    } else {
+      state_.a(1) = std::max(vel_cmd(1) - state_.v(1), static_cast<Scalar>(-4));
+    }
+    if (vel_cmd(2) >= state_.w(2)) {
+      state_.tau(2) = std::min(vel_cmd(2) - state_.w(2), static_cast<Scalar>(0.5));
+    } else {
+      state_.tau(2) = std::max(vel_cmd(2) - state_.w(2), static_cast<Scalar>(-0.5));
+    }
+
+    // dynamics integration
+    integrator_ptr_->step(state_.x, sim_dt, next_state.x);
+
+    // update state and sim time
+    state_.qx /= state_.qx.norm();
+
+    //
+    state_.x = next_state.x;
+    remain_ctl_dt -= sim_dt;
+  }
+  state_.t += ctl_dt;
+  //
+  constrainInWorldBox(old_state);
+  return true;
+}
+
 bool Quadrotor::velocityControlBody(const Command &cmd, const Scalar ctl_dt) {
   if (!cmd.isVelocity()) return false;
   if (!state_.valid()) return false;

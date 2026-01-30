@@ -1,7 +1,7 @@
 /*** 
  * @Author: Flightmare
  * @Date: 2024-11-27 17:32:59 +0800
- * @LastEditTime: 2025-05-17 15:15:29 +0800
+ * @LastEditTime: 2026-01-13 15:09:42 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /src/flightmare/flightlib/src/common/logger.cpp
@@ -26,10 +26,13 @@ Logger::Logger(const std::string& name, const std::string& filename)
   : Logger(name, false) {
   if (!filename.empty()) {
     std::filebuf* fbuf = new std::filebuf;
-    if (fbuf->open(filename, std::ios::out))
+    if (fbuf->open(filename, std::ios::out)) {
+      if (name.empty()) name_ = "";
+      warn("Open file %s success.", filename.c_str());
       sink_.rdbuf(fbuf);
+    }
     else
-      warn("Could not open file %s. Logging to console!", filename);
+      warn("Could not open file %s. Logging to console!", filename.c_str());
   }
   sink_.precision(DEFAULT_PRECISION);
 }

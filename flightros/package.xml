@@ -13,6 +13,7 @@
 
   <depend>flightlib</depend>
   <depend>roscpp</depend>
+  <depend>pcl_ros</depend>
   <depend>autopilot</depend>
   <depend>quadrotor_common</depend>
   <depend>nav_msgs</depend>

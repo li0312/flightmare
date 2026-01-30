@@ -1,10 +1,10 @@
 '''
 Author: Lac_Creeper
 Date: 2025-06-24 14:23:27 +0800
-LastEditTime: 2025-07-08 22:51:53 +0800
+LastEditTime: 2026-01-25 18:18:46 +0800
 LastEditors: Lac_Creeper
 Description: 
-FilePath: /flightmare/flightrl/examples/track_control.py
+FilePath: /src/flightmare/flightrl/examples/track_control.py
 '''
 from ruamel.yaml import YAML, dump, RoundTripDumper
 import warnings
@@ -36,15 +36,22 @@ import rospy
 
 def test_model(env, model):
     ep_num = 0
+    time_sum = 0
+    time_count = 0
     while ep_num <= 0:
         obs, done, ep_len = env.reset(), False, 0
         print(obs.dtype)
         print(obs.shape)
         while not done:  # 双重检查
+            start = time.perf_counter()
             act, _ = model.predict(obs, deterministic=True)
+            end = time.perf_counter()
+            time_sum += (end - start)*1000
+            time_count += 1
+            print(f"平均执行时间: {time_sum/time_count:.6f} ms")
             obs, rew, done, _ = env.step(act)  # 明确忽略infos避免未使用变量警告
             ep_len += 1
-            if ep_len > 3200:
+            if ep_len > 1590:
                 break
         ep_num += 1
 
@@ -180,7 +187,7 @@ def main():
             cliprange=0.2,
             verbose=1,
         )
-        # model = PPO2.load(log_dir + '/2025-06-26-16-59-23.zip', env=env, tensorboard_log=saver.data_dir)
+        # model = PPO2.load(log_dir + '/2026-01-14-00-55-13.zip', env=env, tensorboard_log=saver.data_dir)
 
         # tensorboard
         # Make sure that your chrome browser is already on.

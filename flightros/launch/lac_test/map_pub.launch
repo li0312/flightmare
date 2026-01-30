@@ -1,0 +1,6 @@
+<launch>
+<arg name="debug" default="0" />
+<node name="map_pub" pkg="flightros" type="map_pub" output="screen" unless="$(arg debug)">
+    </node>
+
+</launch>

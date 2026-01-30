@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-16 16:52:43 +0800
- * @LastEditTime: 2025-06-03 17:00:49 +0800
+ * @LastEditTime: 2026-01-18 00:07:38 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /flightmare/flightlib/src/sensors/lidar.cpp
+ * @FilePath: /src/flightmare/flightlib/src/sensors/lidar.cpp
  */
 #include "flightlib/sensors/lidar.hpp"
 
@@ -16,14 +16,14 @@ Lidar::Lidar()
   : pc_resolution_{0.1},
     sensing_horizon_{8.0},
     hrz_laser_line_num_(512),
-    vtc_laser_line_num_(16),
+    vtc_laser_line_num_(32),
     hrz_laser_range_rad_{2 * M_PI},
-    vtc_laser_range_rad_{30.0 / 180.0 * M_PI},
+    vtc_laser_range_rad_{60.0 / 180.0 * M_PI},
     scan_height_min_{0.0},
     scan_height_max_{1.0},
     scan_range_min_{0.1},
     scan_range_max_{5.0},
-    collision_range_{0.4},
+    collision_range_{0.3},
     is_check_collision_(true),
     use_resolution_filter_(true) {
   vtc_resolution_rad_ =
@@ -69,9 +69,9 @@ void Lidar::loadClobalPCFromPLY() {
   logger_.info("Global Pointcloud received..");
 
   pcl::PointCloud<pcl::PointXYZ> cloud_input;
+  // "/home/lac/my_study/flightmare_pro/pointcloud_data/random_map_0.ply"
   if (pcl::io::loadPLYFile<pcl::PointXYZ>(
-        "/home/lac/my_study/flightmare_pro/pointcloud_data/random_map_0.ply",
-        cloud_input) == -1) {
+        "/home/lac/fm_test/my_logs/lac_map.ply", cloud_input) == -1) {
     logger_.error("Couldn't read the PLY file.\n");
     return;
   }

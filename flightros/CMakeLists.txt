@@ -12,6 +12,11 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+# Including dependencies
+find_package(VTK REQUIRED)
+include(${VTK_USE_FILE})
+
+
 option(BUILD_MP "Build Motion Planning" OFF)
 
 catkin_simple()
@@ -61,6 +66,29 @@ cs_add_executable(flight_pilot_node
 target_link_libraries(flight_pilot_node
   flight_pilot
   ${OpenCV_LIBRARIES}
+  stdc++fs
+)
+
+# fast wrapper
+cs_add_library(fast_wrapper
+    src/fast_wrapper/fast_wrapper.cpp
+)
+
+target_link_libraries(fast_wrapper
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
+cs_add_executable(fast_wrapper_node
+   src/fast_wrapper/fast_wrapper_node.cpp
+)
+
+target_link_libraries(fast_wrapper_node
+  fast_wrapper
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
   stdc++fs
 )
 
@@ -162,6 +190,20 @@ cs_add_executable(vel_control_test
 )
 
 target_link_libraries(vel_control_test
+${catkin_LIBRARIES}
+${OpenCV_LIBRARIES}
+${PCL_LIBRARIES}
+stdc++fs
+zmq
+zmqpp
+)
+
+# lac_test
+cs_add_executable(map_pub
+    src/lac_test/map_pub.cpp
+)
+
+target_link_libraries(map_pub
 ${catkin_LIBRARIES}
 ${OpenCV_LIBRARIES}
 ${PCL_LIBRARIES}

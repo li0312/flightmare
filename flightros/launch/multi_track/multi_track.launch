@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="flightros" type="lac_env_node" name="lac_env" output="screen">
+    <rosparam file="$(find flightros)/params/default.yaml" />
+  </node>
+
+  <node pkg="odom_visualization" name="target_odom_visualization" type="odom_visualization" output="screen">
+      <remap from="~odom" to="targetGT"/>
+      <remap from="~cmd" to="target_pos_cmd"/>
+      <param name="init_x" value="0"/>
+      <param name="init_y" value="0"/>
+      <param name="init_z" value="0"/>
+      <param name="color/a" value="0.8"/>
+      <param name="color/r" value="0.0"/>
+      <param name="color/g" value="1.0"/>
+      <param name="color/b" value="0.0"/>
+      <param name="covariance_scale" value="100.0"/>
+      <param name="robot_scale" value="0.35"/>
+      <param name="quadrotor_name" value="target"/>
+      <param name="drone_id" value="0"/>
+      <param name="mesh_resource" value="package://odom_visualization/meshes/spide_man.dae"/>
+    </node>
+
+  <group ns="uav0">
+    <node pkg="flightros" type="lac_drone_node" name="lac_drone" output="screen">
+      <remap from="targetGT" to="/targetGT"/>
+      
+      <param name="main_loop_freq" value="20.0"/>
+      <param name="drone_id" value="0"/>
+      <param name="drone_num" value="1"/>
+      <param name="vel" value="1"/>
+    </node>
+
+    <node pkg="odom_visualization" name="quad0_odom_visualization" type="odom_visualization" output="screen">
+      <remap from="~odom" to="odom"/>
+      <remap from="~cmd" to="pos_cmd"/>
+      <param name="init_x" value="0"/>
+      <param name="init_y" value="0"/>
+      <param name="init_z" value="0"/>
+      <param name="color/a" value="1.0"/>
+      <param name="color/r" value="0.0"/>
+      <param name="color/g" value="0.0"/>
+      <param name="color/b" value="1.0"/>
+      <param name="covariance_scale" value="100.0"/>
+      <param name="robot_scale" value="1.0"/>
+      <param name="quadrotor_name" value="quad0"/>
+      <param name="drone_id" value="0"/>
+      <param name="mesh_resource" value="package://odom_visualization/meshes/hummingbird.mesh"/>
+    </node>
+  </group>
+
+  <group ns="uav1">
+    <node pkg="flightros" type="lac_drone_node" name="lac_drone" output="screen">
+      <remap from="targetGT" to="/targetGT"/>
+      <param name="main_loop_freq" value="20.0"/>
+      <param name="drone_id" value="1"/>
+      <param name="drone_num" value="2"/>
+      <param name="vel" value="1"/>
+    </node>
+
+    <node pkg="odom_visualization" name="quad0_odom_visualization" type="odom_visualization" output="screen">
+      <remap from="~odom" to="odom"/>
+      <remap from="~cmd" to="pos_cmd"/>
+      <param name="init_x" value="0"/>
+      <param name="init_y" value="0"/>
+      <param name="init_z" value="0"/>
+      <param name="color/a" value="1.0"/>
+      <param name="color/r" value="0.0"/>
+      <param name="color/g" value="0.0"/>
+      <param name="color/b" value="1.0"/>
+      <param name="covariance_scale" value="100.0"/>
+      <param name="robot_scale" value="1.0"/>
+      <param name="quadrotor_name" value="quad0"/>
+      <param name="drone_id" value="0"/>
+      <param name="mesh_resource" value="package://odom_visualization/meshes/hummingbird.mesh"/>
+    </node>    
+  </group>
+  
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find flightros)/launch/multi_track/multi_track.rviz" required="true" />
+
+
+</launch>

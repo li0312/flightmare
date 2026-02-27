@@ -1,10 +1,10 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-16 16:52:43 +0800
- * @LastEditTime: 2026-01-18 00:07:38 +0800
+ * @LastEditTime: 2026-02-07 10:23:54 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
- * @FilePath: /src/flightmare/flightlib/src/sensors/lidar.cpp
+ * @FilePath: /flightmare/flightlib/src/sensors/lidar.cpp
  */
 #include "flightlib/sensors/lidar.hpp"
 
@@ -236,6 +236,16 @@ bool Lidar::renderLaserScan(const QuadState& state, bool is_norm) {
 
   return true;
 
+}
+
+bool Lidar::renderLaserScanG(const QuadState &state, bool is_norm) {
+  QuadState stateG;
+  stateG.setZero();
+  Scalar yaw = state.euler_xyz().z();
+  stateG.p = state.p;
+  stateG.x[QS::ATTW] = std::cos(yaw / 2.0);
+  stateG.x[QS::ATTZ] = std::sin(yaw / 2.0);
+  return renderLaserScan(stateG, is_norm);
 }
 
 const pcl::PointCloud<pcl::PointXYZ>& Lidar::getlocalCloud() const {

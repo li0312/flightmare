@@ -92,6 +92,52 @@ target_link_libraries(fast_wrapper_node
   stdc++fs
 )
 
+# multi_track_env
+cs_add_library(lac_env
+    src/multi_track/lac_env.cpp
+)
+
+target_link_libraries(lac_env
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
+cs_add_executable(lac_env_node
+   src/multi_track/lac_env_node.cpp
+)
+
+target_link_libraries(lac_env_node
+  lac_env
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
+# multi_track_drone
+cs_add_library(lac_drone
+    src/multi_track/lac_drone.cpp
+)
+
+target_link_libraries(lac_drone
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
+cs_add_executable(lac_drone_node
+   src/multi_track/lac_drone_node.cpp
+)
+
+target_link_libraries(lac_drone_node
+  lac_drone
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
 # motion_planning
 
 if(BUILD_MP)

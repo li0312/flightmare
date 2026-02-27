@@ -1,20 +1,20 @@
 /***
  * @Author: Lac_Creeper
- * @Date: 2025-05-23 15:11:53 +0800
- * @LastEditTime: 2025-06-09 15:48:29 +0800
+ * @Date: 2026-02-01 17:21:34 +0800
+ * @LastEditTime: 2026-02-01 17:21:35 +0800
  * @LastEditors: Lac_Creeper
  * @Description:
- * @FilePath: /flightmare/flightlib/src/envs/track_env/track_env.cpp
+ * @FilePath: /flightmare/flightlib/src/envs/multiTrack_env/multiTrack_env.cpp
  */
-#include "flightlib/envs/track_env/track_env.hpp"
+#include "flightlib/envs/multiTrack_env/multiTrack_env.hpp"
 
 namespace flightlib {
 
-TrackEnv::TrackEnv()
-  : TrackEnv(getenv("FLIGHTMARE_PATH") +
-             std::string("/flightlib/configs/track_env.yaml")) {}
+MultiTrack::MultiTrack()
+  : MultiTrack(getenv("FLIGHTMARE_PATH") +
+               std::string("/flightlib/configs/track_env.yaml")) {}
 
-TrackEnv::TrackEnv(const std::string& cfg_path)
+MultiTrack::MultiTrack(const std::string& cfg_path)
   : EnvBase(),
     detect_coeff_{0.0f},
     dist_coeff_{0.0f},
@@ -37,37 +37,41 @@ TrackEnv::TrackEnv(const std::string& cfg_path)
   if (use_ros_) {
     int argc = 0;
     char** argv = NULL;
-    ros::init(argc, argv, "track_env_cpp");
+    ros::init(argc, argv, "multiTrackEnv_cpp");
 
     nh_ = std::make_unique<ros::NodeHandle>();
 
     map_pub_ = nh_->advertise<visualization_msgs::MarkerArray>("/obstacles", 1);
-    scan_pub_ = nh_->advertise<sensor_msgs::LaserScan>("/scan", 1);
-    odom_pub_ = nh_->advertise<nav_msgs::Odometry>("/odom", 1);
+    scanPub0_ = nh_->advertise<sensor_msgs::LaserScan>("/drone0/scan", 1);
+    scanPub1_ = nh_->advertise<sensor_msgs::LaserScan>("/drone1/scan", 1);
+    odomPub0_ = nh_->advertise<nav_msgs::Odometry>("/drone0/odom", 1);
+    odomPub1_ = nh_->advertise<nav_msgs::Odometry>("/drone1/odom", 1);
     target_pub_ = nh_->advertise<nav_msgs::Odometry>("/target", 1);
     debug_pub_ =
       nh_->advertise<geometry_msgs::PoseWithCovarianceStamped>("/debug", 1);
   }
 
-  quadrotor_ptr_ = std::make_shared<Quadrotor>();
+  drone0_ = std::make_shared<Quadrotor>();
+  drone1_ = std::make_shared<Quadrotor>();
   // update dynamics
   QuadrotorDynamics dynamics;
   dynamics.updateParams(cfg_);
-  quadrotor_ptr_->updateDynamics(dynamics);
+  drone0_->updateDynamics(dynamics);
+  drone1_->updateDynamics(dynamics);
 
   // define a world box
   world_box_ << -50, 50, -50, 50, 0, 20;
-  if (!quadrotor_ptr_->setWorldBox(world_box_)) {
+  if (!drone0_->setWorldBox(world_box_) || !drone1_->setWorldBox(world_box_)) {
     logger_.error("Cannot set world box!!");
   }
 
   // define input and output dimension for the environment
-  obs_dim_ = trackenv::kNObs;
-  act_dim_ = trackenv::kNAct;
+  obs_dim_ = multitrack::kNObs;
+  act_dim_ = multitrack::kNAct;
 
   act_std_.setZero();
-  act_std_.x() = 3.5f;
-  act_std_.y() = 3.5f;
+  act_std_.x() = 2.5f;
+  act_std_.y() = 2.0f;
   act_std_.z() = 0.5f;
   // detect settings
   // desired_dist_ = 6.0f;   //For fov_69
@@ -76,13 +80,15 @@ TrackEnv::TrackEnv(const std::string& cfg_path)
   desired_bbox_ = {448, 154, 511, 365};  // For fov_108
 
   // lidar settings
-  // lidar_.loadMap("/home/lac/fm_test/my_logs/lac_map.log");
-  lidar_.generateRandomMap(30, 25);
+  lidar0_.loadMap("/home/lac/fm_test/my_logs/lac_map.log");
+  lidar1_.loadMap("/home/lac/fm_test/my_logs/lac_map.log");
+  // lidar0_.generateRandomMap(30, 25);
+  // lidar1_.generateRandomMap(30, 25);
   // lidar_.generateRandomMap(20, 20);
 
   if (use_ros_) {
     std::vector<std::shared_ptr<Obstacle>> obstacles;
-    obstacles = lidar_.getObstacles();
+    obstacles = lidar0_.getObstacles();
     for (int i = 0; i < 20; ++i) {
       visualizeObstacles(obstacles);
       ros::Rate loop_rate(10);
@@ -93,23 +99,24 @@ TrackEnv::TrackEnv(const std::string& cfg_path)
   logger_.debug("Init success..");
 }
 
-TrackEnv::~TrackEnv() {}
+MultiTrack::~MultiTrack() {}
 
 
-Vector<3> TrackEnv::convVel() {
-  Scalar yaw = quad_state_.euler_xyz().z();
+Vector<3> MultiTrack::convVel() {
+  Scalar yaw = quadState0_.euler_xyz().z();
   Vector<3> localVel;
-  localVel.x() = cos(yaw) * quad_state_.v.x() + sin(yaw) * quad_state_.v.y();
-  localVel.y() = -sin(yaw) * quad_state_.v.x() + cos(yaw) * quad_state_.v.y();
+  localVel.x() = cos(yaw) * quadState0_.v.x() + sin(yaw) * quadState0_.v.y();
+  localVel.y() = -sin(yaw) * quadState0_.v.x() + cos(yaw) * quadState0_.v.y();
   // logger_.info("local_v: [%.2f, %.2f]", localVel.x(), local_vy);
-  localVel.z() = quad_state_.x(QS::OMEZ);
+  localVel.z() = quadState0_.x(QS::OMEZ);
   return localVel;
 }
 
-bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
+bool MultiTrack::reset(Ref<Vector<>> obs, const bool random) {
   step_num_ = 0;
   reach_count_ = 0;
-  quad_state_.setZero();
+  quadState0_.setZero();
+  quadState1_.setZero();
   track_act_.setZero();
   last_act_.setZero();
   // traj_param_ = 1.75 + uniform_dist_(random_gen_) * 0.75;
@@ -159,15 +166,17 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
     bool has_collision = true;
     bool has_visual = false;
     while (has_collision || (!has_visual)) {
-      // Scalar init_x = uniform_dist_(random_gen_) * 2.0f;
-      // Scalar init_y = uniform_dist_(random_gen_) * 2.0f;
+      Scalar initX0 = 0.0;
+      Scalar initY0 = 0.0;
+      Scalar initX1 = 0.0;
+      Scalar initY1 = 0.0;
       Scalar init_x = 0.0;
       Scalar init_y = 0.0;
-      quad_state_.x(QS::POSX) = init_x;
-      quad_state_.x(QS::POSY) = init_y;
-      quad_state_.x(QS::POSZ) = 0.8f;
+      quadState0_.x(QS::POSX) = initX0;
+      quadState0_.x(QS::POSY) = initY0;
+      quadState0_.x(QS::POSZ) = 0.8f;
       // Scalar yaw = uniform_dist_(random_gen_) * M_PI;
-      Scalar yaw = M_PI_2;
+      Scalar yaw = 0.0;
       quad_state_.x(QS::ATTW) = std::cos(yaw / 2.0);
       quad_state_.x(QS::ATTX) = 0.0f;
       quad_state_.x(QS::ATTY) = 0.0f;
@@ -179,7 +188,7 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
       Scalar tag_y = 0.0;
       target_xyY_.x() = init_x + tag_x * std::cos(yaw) - tag_y * std::sin(yaw);
       target_xyY_.y() = init_y + tag_x * std::sin(yaw) + tag_y * std::cos(yaw);
-      target_xyY_.z() = yaw - M_PI_2;
+      target_xyY_.z() = yaw;
       targetInitPose_ = target_xyY_;
       std::vector<Scalar> temp_scan;
       has_collision = lidar_.simulateLidar(quad_state_, temp_scan, 1.0, false);
@@ -206,7 +215,7 @@ bool TrackEnv::reset(Ref<Vector<>> obs, const bool random) {
   return true;
 }
 
-bool TrackEnv::getObs(Ref<Vector<>> obs) {
+bool MultiTrack::getObs(Ref<Vector<>> obs) {
   // logger_.debug("getObs start..");
 
   quadrotor_ptr_->getState(&quad_state_);
@@ -215,41 +224,41 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
   std::vector<Scalar> scan_data;
   bool has_collision = lidar_.simulateLidar(quad_state_, scan_data, 0.2, true);
 
-  Vector<trackenv::kNLaser1> scan =
-    Vector<trackenv::kNLaser1>::Map(scan_data.data(), scan_data.size());
+  Vector<multitrack::kNLaser1> scan =
+    Vector<multitrack::kNLaser1>::Map(scan_data.data(), scan_data.size());
 
   detect_.updateTarget(target_xyY_);
   detect_.getBBoxG(quad_state_, detect_bbox_);
   // std::cout << detect_bbox_ << std::endl;
 
   Scalar yaw = quad_state_.euler_xyz().z();
-  Scalar theta = target_xyY_.z() - yaw + M_PI_2;
+  Scalar theta = target_xyY_.z() - yaw;
 
   if (!has_init_obs_) {
-    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) = scan;
-    track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) = scan;
-    track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
-    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
+    track_obs_.segment<multitrack::kNLaser1>(multitrack::kLaser1) = scan;
+    track_obs_.segment<multitrack::kNLaser2>(multitrack::kLaser2) = scan;
+    track_obs_.segment<multitrack::kNLaser3>(multitrack::kLaser3) = scan;
+    track_obs_.segment<multitrack::kNDetect>(multitrack::kDetect) =
       detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNDirt>(trackenv::kDirt) =
-      Vector<trackenv::kNDirt>{std::cos(theta), std::sin(theta)};
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) =
-      Vector<trackenv::kNAct>::Zero();
+    track_obs_.segment<multitrack::kNDirt>(multitrack::kDirt) =
+      Vector<multitrack::kNDirt>{std::cos(theta), std::sin(theta)};
+    track_obs_.segment<multitrack::kNState>(multitrack::kState) =
+      Vector<multitrack::kNAct>::Zero();
     has_init_obs_ = true;
   } else {
-    track_obs_.segment<trackenv::kNLaser1>(trackenv::kLaser1) =
-      track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2);
-    track_obs_.segment<trackenv::kNLaser2>(trackenv::kLaser2) =
-      track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3);
-    track_obs_.segment<trackenv::kNLaser3>(trackenv::kLaser3) = scan;
-    track_obs_.segment<trackenv::kNDetect>(trackenv::kDetect) =
+    track_obs_.segment<multitrack::kNLaser1>(multitrack::kLaser1) =
+      track_obs_.segment<multitrack::kNLaser2>(multitrack::kLaser2);
+    track_obs_.segment<multitrack::kNLaser2>(multitrack::kLaser2) =
+      track_obs_.segment<multitrack::kNLaser3>(multitrack::kLaser3);
+    track_obs_.segment<multitrack::kNLaser3>(multitrack::kLaser3) = scan;
+    track_obs_.segment<multitrack::kNDetect>(multitrack::kDetect) =
       detect_bbox_.obs();
-    track_obs_.segment<trackenv::kNDirt>(trackenv::kDirt) =
-      Vector<trackenv::kNDirt>{std::cos(theta), std::sin(theta)};
-    track_obs_.segment<trackenv::kNState>(trackenv::kState) = convVel();
+    track_obs_.segment<multitrack::kNDirt>(multitrack::kDirt) =
+      Vector<multitrack::kNDirt>{std::cos(theta), std::sin(theta)};
+    track_obs_.segment<multitrack::kNState>(multitrack::kState) = convVel();
   }
 
-  obs.segment<trackenv::kNObs>(trackenv::kObs) = track_obs_;
+  obs.segment<multitrack::kNObs>(multitrack::kObs) = track_obs_;
 
   // -DEBUG:
   if (use_ros_) {
@@ -262,7 +271,7 @@ bool TrackEnv::getObs(Ref<Vector<>> obs) {
   return true;
 }
 
-Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
+Scalar MultiTrack::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   step_num_ += 1;
   last_act_ = track_act_;
   Scalar k_v = 1.0;
@@ -342,8 +351,9 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   // ================= reward function design ===================
   // - detection term
   Scalar detect_reward = detect_coeff_ * detect_bbox_.IoU(desired_bbox_);
-  // Vector<3> detect_norm = obs.segment<trackenv::kNDetect>(trackenv::kDetect);
-  // Scalar detect_reward =
+  // Vector<3> detect_norm =
+  // obs.segment<multitrack::kNDetect>(multitrack::kDetect); Scalar
+  // detect_reward =
   //     -0.1*abs(detect_norm.x()) - 0.1*abs(detect_norm.y()) -
   //     0.1*abs(detect_norm.z());
 
@@ -369,15 +379,14 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
 
   // - theta term
   /// TODO: add direction vector reward
-  Scalar theta =
-    cos(yaw - M_PI_2) * cos(target_yaw) + sin(yaw - M_PI_2) * sin(target_yaw);
+  Scalar theta = cos(yaw) * cos(target_yaw) + sin(yaw) * sin(target_yaw);
   Scalar theta_reward = (theta - 1) * theta_coeff_;
   last_theta_ = theta;
 
   // - control action penalty
   Scalar act_norm = act.cast<Scalar>().norm();
   Scalar acc_punish = 0.0;
-  Vector<3> vel_xyY = obs.segment<trackenv::kNState>(trackenv::kState);
+  Vector<3> vel_xyY = obs.segment<multitrack::kNState>(multitrack::kState);
   // logger_.warn("vel_xyY: [%.2f, %.2f, %.2f]", vel_xyY[0], vel_xyY[1],
   //              vel_xyY[2]);
   // logger_.warn("last_act_: [%.2f, %.2f, %.2f]", last_act_[0], last_act_[1],
@@ -449,7 +458,7 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   return total_reward;
 }
 
-bool TrackEnv::isTerminalState(Scalar& reward) {
+bool MultiTrack::isTerminalState(Scalar& reward) {
   if (!detect_bbox_.is_valid()) {
     reward = -40;
     logger_.warn("target loss..%d", step_num_);
@@ -463,14 +472,14 @@ bool TrackEnv::isTerminalState(Scalar& reward) {
   if (step_num_ >= 300 && reach_count_ > 20) {
     logger_.debug("time out..%d, %d", step_num_, reach_count_);
   }
-  if ((abs(quad_state_.v.x()) > 5.0) || (abs(quad_state_.v.y()) > 5.0)) {
+  if ((abs(quad_state_.v.x()) > 3.5) || (abs(quad_state_.v.y()) > 3.5)) {
     logger_.fatal("control error..%d", step_num_);
   }
   reward = 0.0f;
   return false;
 }
 
-bool TrackEnv::loadParam(const YAML::Node& cfg) {
+bool MultiTrack::loadParam(const YAML::Node& cfg) {
   if (cfg["track_env"]) {
     sim_dt_ = cfg["track_env"]["sim_dt"].as<Scalar>();
     max_t_ = cfg["track_env"]["max_t"].as<Scalar>();
@@ -498,7 +507,7 @@ bool TrackEnv::loadParam(const YAML::Node& cfg) {
   return true;
 }
 
-void TrackEnv::visualizeObstacles(
+void MultiTrack::visualizeObstacles(
   std::vector<std::shared_ptr<Obstacle>>& obstacles) {
   visualization_msgs::MarkerArray markers;
   int id = 0;
@@ -562,7 +571,7 @@ void TrackEnv::visualizeObstacles(
   map_pub_.publish(markers);
 }
 
-void TrackEnv::visualizeScan() {
+void MultiTrack::visualizeScan() {
   // 发布TF (假设机器人在地图中心)
   static tf::TransformBroadcaster br;
   tf::Transform transform;
@@ -591,7 +600,7 @@ void TrackEnv::visualizeScan() {
   scan_pub_.publish(scan);
 }
 
-void TrackEnv::visualizeOdom() {
+void MultiTrack::visualizeOdom() {
   nav_msgs::Odometry odom;
   odom.header.stamp = ros::Time::now();
   odom.header.frame_id = "world";
@@ -613,7 +622,7 @@ void TrackEnv::visualizeOdom() {
   odom_pub_.publish(odom);
 }
 
-void TrackEnv::visualizeTarget() {
+void MultiTrack::visualizeTarget() {
   nav_msgs::Odometry target;
   target.header.stamp = ros::Time::now();
   target.header.frame_id = "world";
@@ -630,7 +639,7 @@ void TrackEnv::visualizeTarget() {
   target_pub_.publish(target);
 }
 
-bool TrackEnv::getAct(Ref<Vector<>> act) const {
+bool MultiTrack::getAct(Ref<Vector<>> act) const {
   if (cmd_.t >= 0.0 && track_act_.allFinite()) {
     act = track_act_;
     return true;
@@ -638,17 +647,17 @@ bool TrackEnv::getAct(Ref<Vector<>> act) const {
   return false;
 }
 
-bool TrackEnv::getAct(Command* const cmd) const {
+bool MultiTrack::getAct(Command* const cmd) const {
   if (!cmd_.valid()) return false;
   *cmd = cmd_;
   return true;
 }
 
-void TrackEnv::addObjectsToUnity(std::shared_ptr<UnityBridge> bridge) {
+void MultiTrack::addObjectsToUnity(std::shared_ptr<UnityBridge> bridge) {
   bridge->addQuadrotor(quadrotor_ptr_);
 }
 
-std::ostream& operator<<(std::ostream& os, const TrackEnv& track_env) {
+std::ostream& operator<<(std::ostream& os, const MultiTrack& track_env) {
   os.precision(3);
   os << "Tracking Environment:\n"
      << "obs dim =            [" << track_env.obs_dim_ << "]\n"

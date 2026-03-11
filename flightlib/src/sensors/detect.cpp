@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:38:23 +0800
- * @LastEditTime: 2026-01-18 00:04:01 +0800
+ * @LastEditTime: 2026-03-06 09:05:55 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /src/flightmare/flightlib/src/sensors/detect.cpp
@@ -23,7 +23,8 @@ DetectSim::DetectSim()
   Vector<3> target_xyY = {5.0f, 0.0f, 0.0f};
   updateTarget(target_xyY);
 
-  t_BC_ = {0.1f, 0.0f, -0.03f};
+  // t_BC_ = {0.1f, 0.0f, -0.03f};
+  t_BC_ = {0.0f, 0.0f, 0.0f};
   R_BC_ << 0.0f, -1.0f, 0.0f, 
            0.0f, 0.0f, -1.0f,
            1.0f, 0.0f, 0.0f;

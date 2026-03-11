@@ -33,40 +33,40 @@
 
 namespace flightlib {
 
-namespace trackenv {
+namespace trackAdvenv {
 
 enum Ctl : int {
   // observations
   kObs = 0,
   //
-  kLaser1 = 0,
-  kNLaser1 = 512,
-  kLaser2 = 512,
-  kNLaser2 = 512,
-  kLaser3 = 1024,
-  kNLaser3 = 512,
-  kDetect = 1536,
-  kNDetect = 3,
-  kDirt = 1539,
+  kLaser = 0,
+  kNLaser = 512,
+  kDetect1 = 512,
+  kNDetect1 = 3,
+  kDetect2 = 515,
+  kNDetect2 = 3,
+  kDetect3 = 518,
+  kNDetect3 = 3,
+  kDirt = 521,
   kNDirt = 2,
-  kState = 1541,
+  kState = 523,
   kNState = 3,
 
-  kNObs = 1544,
+  kNObs = 526,
 
   // control actions
   kAct = 0,
   kNAct = 3,
 
 };
-};  // namespace trackenv
-class TrackEnv final : public EnvBase {
+};  // namespace trackAdvenv
+class TrackAdvEnv final : public EnvBase {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  TrackEnv();
-  TrackEnv(const std::string &cfg_path);
-  ~TrackEnv();
+  TrackAdvEnv();
+  TrackAdvEnv(const std::string &cfg_path);
+  ~TrackAdvEnv();
 
   // - public OpenAI-gym-style functions
   bool reset(Ref<Vector<>> obs, const bool random = true) override;
@@ -84,7 +84,7 @@ class TrackEnv final : public EnvBase {
   bool isTerminalState(Scalar &reward) override;
   void addObjectsToUnity(std::shared_ptr<UnityBridge> bridge);
 
-  friend std::ostream &operator<<(std::ostream &os, const TrackEnv &track_env);
+  friend std::ostream &operator<<(std::ostream &os, const TrackAdvEnv &track_env);
 
   Vector<3> convVel();
 
@@ -116,7 +116,7 @@ class TrackEnv final : public EnvBase {
   // Lidar lidar_;
   Lidar2D lidar_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
   DetectSim detect_;
-  Logger logger_{"Env"};
+  Logger logger_{"TrackAdvEnv"};
 
   int step_num_;
   int reach_count_;
@@ -130,8 +130,8 @@ class TrackEnv final : public EnvBase {
   bool has_init_reward_;
 
   // observations and actions (for RL)
-  Vector<trackenv::kNObs> track_obs_;
-  Vector<trackenv::kNAct> track_act_, last_act_;
+  Vector<trackAdvenv::kNObs> track_obs_;
+  Vector<trackAdvenv::kNAct> track_act_, last_act_;
 
   // reward function design (for model-free RL)
   BBox detect_bbox_;
@@ -142,7 +142,7 @@ class TrackEnv final : public EnvBase {
   bool has_init_obs_;
 
   // action and observation normalization (for RL)
-  Vector<trackenv::kNAct> act_std_;
+  Vector<trackAdvenv::kNAct> act_std_;
 
   YAML::Node cfg_;
   Matrix<3, 2> world_box_;

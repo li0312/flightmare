@@ -18,6 +18,7 @@
 #include "flightlib/envs/quadrotor_env/quadrotor_env.hpp"
 #include "flightlib/envs/test_env.hpp"
 #include "flightlib/envs/track_env/track_env.hpp"
+#include "flightlib/envs/trackAdv_env/trackAdv_env.hpp"
 #include "flightlib/envs/vec_env.hpp"
 
 namespace py = pybind11;
@@ -69,6 +70,27 @@ PYBIND11_MODULE(flightgym, m) {
     .def("getActDim", &VecEnv<TrackEnv>::getActDim)
     .def("getExtraInfoNames", &VecEnv<TrackEnv>::getExtraInfoNames)
     .def("__repr__", [](const VecEnv<TrackEnv>& a) {
+      return "RPG Drone Tracking Environment";
+    });
+
+  py::class_<VecEnv<TrackAdvEnv>>(m, "TrackAdvEnv_v2")
+    .def(py::init<>())
+    .def(py::init<const std::string&>())
+    .def(py::init<const std::string&, const bool>())
+    .def("reset", &VecEnv<TrackAdvEnv>::reset)
+    .def("step", &VecEnv<TrackAdvEnv>::step)
+    .def("testStep", &VecEnv<TrackAdvEnv>::testStep)
+    .def("setSeed", &VecEnv<TrackAdvEnv>::setSeed)
+    .def("close", &VecEnv<TrackAdvEnv>::close)
+    .def("isTerminalState", &VecEnv<TrackAdvEnv>::isTerminalState)
+    .def("curriculumUpdate", &VecEnv<TrackAdvEnv>::curriculumUpdate)
+    .def("connectUnity", &VecEnv<TrackAdvEnv>::connectUnity)
+    .def("disconnectUnity", &VecEnv<TrackAdvEnv>::disconnectUnity)
+    .def("getNumOfEnvs", &VecEnv<TrackAdvEnv>::getNumOfEnvs)
+    .def("getObsDim", &VecEnv<TrackAdvEnv>::getObsDim)
+    .def("getActDim", &VecEnv<TrackAdvEnv>::getActDim)
+    .def("getExtraInfoNames", &VecEnv<TrackAdvEnv>::getExtraInfoNames)
+    .def("__repr__", [](const VecEnv<TrackAdvEnv>& a) {
       return "RPG Drone Tracking Environment";
     });
 

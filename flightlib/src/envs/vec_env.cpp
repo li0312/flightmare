@@ -221,5 +221,6 @@ template class VecEnv<QuadrotorEnv>;
 template class VecEnv<TrackEnv>;
 template class VecEnv<ObstacleEnv>;
 template class VecEnv<GimbalEnv>;
+template class VecEnv<TrackAdvEnv>;
 
 }  // namespace flightlib

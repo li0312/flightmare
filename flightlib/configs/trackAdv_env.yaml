@@ -4,7 +4,7 @@ track_env:
    use_ros: 1
    fine_turn: 0
    random: 0
-   tMaxV: 0.8
+   tMaxV: 1.0
 
 quadrotor_dynamics:
   mass: 0.73
@@ -17,9 +17,9 @@ quadrotor_dynamics:
   omega_max: [3.0, 3.0, 3.0]  # body rate constraint (x, y, z) 
 
 rl:
-  detect_coeff: 0.5   # 0.2
-  dist_coeff: 7.5     # 2.5
-  alpha_coeff: 0.2    # 0.5
+  detect_coeff: 0.2   # 0.2
+  dist_coeff: 0.8     # 2.5
+  alpha_coeff: 0.4    # 0.5
   pos_coeff: 0.0
-  theta_coeff: 0.2
+  theta_coeff: 0.05
   act_coeff: 0.0025

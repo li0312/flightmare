@@ -1,10 +1,10 @@
 '''
 Author: Lac_Creeper
-Date: 2025-06-24 14:23:27 +0800
-LastEditTime: 2026-03-08 14:54:15 +0800
+Date: 2026-03-06 19:02:48 +0800
+LastEditTime: 2026-03-11 18:31:02 +0800
 LastEditors: Lac_Creeper
 Description: 
-FilePath: /src/flightmare/flightrl/examples/track_control.py
+FilePath: /src/flightmare/flightrl/examples/trackAdv_control.py
 '''
 from ruamel.yaml import YAML, dump, RoundTripDumper
 import warnings
@@ -23,12 +23,12 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from stable_baselines import logger
 
 #
-from rpg_baselines.common.policies import LaserPolicy
+from rpg_baselines.common.policies import LaserLstmPolicy, LaserMlpPolicy
 from rpg_baselines.ppo.ppo2 import PPO2
 from rpg_baselines.envs import vec_env_wrapper as wrapper
 import rpg_baselines.common.util as U
 #
-from flightgym import TrackEnv_v1
+from flightgym import TrackAdvEnv_v2
 
 import rospy
 
@@ -39,31 +39,39 @@ def test_model(env, model):
     time_count = 0
     while ep_num <= 0:
         obs, done, ep_len = env.reset(), False, 0
+        state = None
+        mask = [True]
         print(obs.dtype)
         print(obs.shape)
         while not done:  # 双重检查
             start = time.perf_counter()
-            act, _ = model.predict(obs, deterministic=True)
+            act, next_state = model.predict(obs, state=state, mask=mask,
+                                            deterministic=True)
             end = time.perf_counter()
             time_sum += (end - start)*1000
             time_count += 1
             print(f"平均执行时间: {time_sum/time_count:.6f} ms")
             obs, rew, done, _ = env.step(act)  # 明确忽略infos避免未使用变量警告
+            done = done[0]  # 处理单环境的done
+            state = next_state
+            mask = [done]
             ep_len += 1
-            if ep_len > 4000:
+            if ep_len > 3000:
                 break
         ep_num += 1
 
 
 def my_schedule(initial_value=3e-4, final_value=3e-5):
     def schedule(progress):
-        if progress >= 0.75:
+        if progress >= 0.8:
             return initial_value
         elif progress <= 0.25:
             return final_value
         else:
             return final_value + (initial_value - final_value) * progress
     return schedule
+
+
 
 def configure_random_seed(seed, env=None):
     if env is not None:
@@ -93,7 +101,7 @@ def main():
     if not args.train:
         cfg["env"]["num_envs"] = 1
         cfg["env"]["num_threads"] = 1
-        rospy.init_node("track_env_py", anonymous=True)
+        rospy.init_node("trackAdv_env_py", anonymous=True)
 
         
     if args.render:
@@ -101,7 +109,7 @@ def main():
     else:
         cfg["env"]["render"] = "no"
 
-    env = wrapper.FlightEnvVec(TrackEnv_v1(
+    env = wrapper.FlightEnvVec(TrackAdvEnv_v2(
         dump(cfg, Dumper=RoundTripDumper), False))
 
     # set random seed
@@ -112,26 +120,26 @@ def main():
     if args.train:
         # save the configuration and other files
         rsg_root = os.path.dirname(os.path.abspath(__file__))
-        log_dir = rsg_root + '/track_saved'
+        log_dir = rsg_root + '/trackAdv_saved'
         saver = U.ConfigurationSaver(log_dir=log_dir)
-        model = PPO2(
-            tensorboard_log=saver.data_dir,
-            policy=LaserPolicy,  # check activation function
-            env=env,
-            lam=0.95,
-            gamma=0.99,  # lower 0.9 ~ 0.99
-            # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
-            n_steps=300,
-            ent_coef=0.00,
-            learning_rate=my_schedule(3e-4, 3e-5),
-            vf_coef=0.5,
-            max_grad_norm=0.5,
-            nminibatches=1,
-            noptepochs=10,
-            cliprange=0.2,
-            verbose=1,
-        )
-        # model = PPO2.load(log_dir + '/2026-01-14-00-55-13.zip', env=env, tensorboard_log=saver.data_dir)
+        # model = PPO2(
+        #     tensorboard_log=saver.data_dir,
+        #     policy=LaserLstmPolicy,  # check activation function
+        #     env=env,
+        #     lam=0.95,
+        #     gamma=0.99,  # lower 0.9 ~ 0.99
+        #     # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
+        #     n_steps=300,
+        #     ent_coef=0.00,
+        #     learning_rate=my_schedule(5e-4, 3e-5),
+        #     vf_coef=0.5,
+        #     max_grad_norm=0.5,
+        #     nminibatches=1,
+        #     noptepochs=10,
+        #     cliprange=0.2,
+        #     verbose=1,
+        # )
+        model = PPO2.load(log_dir + '/2026-01-14-00-55-13.zip', env=env, tensorboard_log=saver.data_dir)
 
         # tensorboard
         # Make sure that your chrome browser is already on.
@@ -144,7 +152,7 @@ def main():
         # 2000000000 is 4000 iterations.
         logger.configure(folder=saver.data_dir)
         model.learn(
-            total_timesteps=int(90000000),
+            total_timesteps=int(72000000),
             log_dir=saver.data_dir, logger=logger)
         model.save(saver.data_dir)
 

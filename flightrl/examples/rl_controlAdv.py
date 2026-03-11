@@ -1,11 +1,3 @@
-'''
-Author: Lac_Creeper
-Date: 2026-02-05 15:33:47 +0800
-LastEditTime: 2026-03-05 14:10:53 +0800
-LastEditors: Lac_Creeper
-Description: 
-FilePath: /src/flightmare/flightrl/examples/rl_control.py
-'''
 import yaml
 from yaml.loader import SafeLoader
 
@@ -23,10 +15,10 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 #
 from stable_baselines import logger
-from stable_baselines.common.schedules import LinearSchedule
-from rpg_baselines.common.policies import FeedForwardPolicy
+from rpg_baselines.common.policies import LaserLstmPolicy
 from rpg_baselines.ppo.ppo2 import PPO2
 from rpg_baselines.envs import vec_env_wrapper as wrapper
 import rpg_baselines.common.util as U
@@ -43,66 +35,12 @@ from cv_bridge import CvBridge
 
 
 WINDOW_SIZE = 5
-MODEL_NAME = "/home/lac/fm_test/src/flightmare/flightrl/examples/track_saved/2026-01-17-19-31-40.zip"
+MODEL_NAME = "/home/lac/fm_test/src/flightmare/flightrl/examples/trackAdv_saved/2026-03-10-14-52-51.zip"
+USE_RNN = False
+if (MODEL_NAME.find("Adv") >= 0):
+    USE_RNN = True
 
 
-class TrackPolicy(FeedForwardPolicy):
-    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, **kwargs):
-        super(TrackPolicy, self).__init__(
-            sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=reuse,
-            feature_extraction="mlp", **kwargs)
-
-    def mlp_extractor(self, flattened_obs, **kwargs):
-        """
-        自定义特征提取逻辑(TensorFlow 实现）
-        :param flattened_obs: 展平后的观测张量 (batch_size, flattened_dim)
-        :return: (pi_features, vf_features) 用于 Actor/Critic 的特征
-        """
-        # 假设观测已展平为 [lidar(3*512) + detect(3) + state(3)]
-        lidar_dim = 3 * 512
-        detect_dim = 5
-        state_dim = 3
-        # 1. 拆分展平后的观测, shape=(batch, N)
-        lidar_data = flattened_obs[:, :lidar_dim]
-        detect_data = flattened_obs[:, lidar_dim:lidar_dim+detect_dim]
-        state_data = flattened_obs[:, -state_dim:]
-        # 2. 处理 Lidar 数据（1D CNN）
-        lidar_data = tf.reshape(lidar_data, [-1, 3, 512])
-        conv1 = tf.layers.conv1d(
-            inputs=lidar_data,
-            filters=32,
-            kernel_size=5,
-            strides=2,
-            padding='same',
-            activation=tf.nn.relu,
-            name="lidar_conv1"
-        )  # shape=(batch, 3, 32)
-        conv2 = tf.layers.conv1d(
-            inputs=conv1,
-            filters=32,
-            kernel_size=3,
-            strides=2,
-            padding='same',
-            activation=tf.nn.relu,
-            name="lidar_conv2"
-        )  # shape=(batch, 3, 32)
-        flattened = tf.layers.flatten(conv2)                     # shape=(batch, 3*32*128)
-        lidar_features = tf.layers.dense(
-            flattened,
-            units=512,
-            activation=tf.nn.relu,
-            name="lidar_fc"
-        )  # shape=(batch, 256)
-        # 3. 合并所有特征
-        combined = tf.concat([lidar_features, detect_data, state_data], axis=1)  # shape=(batch, 256+3+3)
-        features = tf.layers.dense(
-            combined,
-            units=256,
-            activation=tf.nn.relu,
-            name="final_fc"
-        )  # shape=(batch, 128)
-        # 返回相同特征给 Actor 和 Critic（SB2 会在此后追加各自的 MLP）
-        return features, features
     
 
 class Estimator:
@@ -239,12 +177,15 @@ def parser():
                         help="Drone id")
     parser.add_argument('--use_esti', type=bool, default=0,
                         help="Use Estimator or not")
+    # parser.add_argument('--use_rnn', type=bool, default=0,
+    #                     help="Use RNN or not")
     return parser
 
 
 class RLTrack():
-    def __init__(self, model, ns, use_esti):
+    def __init__(self, model, ns, use_esti, use_rnn):
         self.model = PPO2.load(model)
+        self.use_rnn = use_rnn
 
         # estimator
         other_ns = ""
@@ -260,15 +201,20 @@ class RLTrack():
         self.desire_uvh = [480, 260, 210]
         self.desire_dist = 3
 
-        self.scan_list = []
         self.odom_list = []
-        self.detect = None
+        self.box_list = []
+        self.scan_norm = None
+        self.dirt = None
         self.vel = None
         self.box = None
         self.box_last = None
         self.odom_other_list = []
         self.box_other = None
         self.odom_other = None
+
+        # For RNN
+        self.mask = [True]
+        self.state = None
 
         # ROS Publisher
         self.cmd_pub = rospy.Publisher(ns + "/vel_ctrl", TwistStamped, queue_size=1)
@@ -285,10 +231,18 @@ class RLTrack():
     def run(self):
         if not self.has_init():
             return
-        scan_flat = np.array(self.scan_list).reshape(-1)
-        other_obs = np.array(self.detect + self.vel)
-        obs = np.concatenate((scan_flat, other_obs))
-        act, _ = self.model.predict(obs, deterministic=True)
+        scan_flat = np.array(self.scan_norm)
+        detect_obs = np.array(self.box_list).reshape(-1)
+        other_obs = np.array(self.dirt + self.vel)
+        obs = np.concatenate((scan_flat, detect_obs))
+        obs = np.concatenate((obs, other_obs))
+        if self.use_rnn:
+            act, next_state = self.model.predict(obs, state=self.state, 
+                                                mask=self.mask, deterministic=True)
+            self.state = next_state
+            self.mask = [False]
+        else:
+            act, _ = self.model.predict(obs, deterministic=True)
         cmd_msg = TwistStamped()
         cmd_msg.header.stamp = rospy.Time.now()
         cmd_msg.twist.linear.x = act[0] * 2.5
@@ -298,7 +252,7 @@ class RLTrack():
 
 
     def has_init(self):
-        return self.scan_list and self.odom_list and self.detect
+        return self.scan_norm and self.odom_list and self.box_list
     
 
     def odomCB(self, msg: Odometry):
@@ -310,10 +264,7 @@ class RLTrack():
     def scanCB(self, msg: LaserScan):
         scan = msg.ranges
         scan_norm = [np.exp(-i) for i in scan]
-        if not self.scan_list:
-            self.scan_list = [scan_norm, scan_norm, scan_norm]
-        else:
-            self.scan_list = self.scan_list[1:] + [scan_norm]
+        self.scan_norm = scan_norm
     
     def otherOdomCB(self, msg: Odometry):
         if len(self.odom_other_list) < WINDOW_SIZE:
@@ -409,17 +360,30 @@ class RLTrack():
         bbox_obs = [((umin + umax) / 2.0 - 480.0) / 960.0,
                     ((vmin + vmax) / 2.0 - 260.0) / 540.0,
                     (vmax - vmin - 210.0) / 540.0]
+        if not self.box_list:
+            self.box_list = [bbox_obs, bbox_obs, bbox_obs]
+        else:
+            self.box_list = self.box_list[1:] + [bbox_obs]
         dirt_obs = [msg.pose.position.x, 
                     msg.pose.position.y]
-        self.detect = bbox_obs + dirt_obs
+        self.dirt = dirt_obs
 
         # publish RL command
         if not self.has_init():
             return
-        scan_flat = np.array(self.scan_list).reshape(-1)
-        other_obs = np.array(self.detect + self.vel)
-        obs = np.concatenate((scan_flat, other_obs))
-        act, _ = self.model.predict(obs, deterministic=True)
+        scan_flat = np.array(self.scan_norm)
+        detect_obs = np.array(self.box_list).reshape(-1)
+        other_obs = np.array(self.dirt + self.vel)
+        obs = np.concatenate((scan_flat, detect_obs))
+        obs = np.concatenate((obs, other_obs)).reshape(1, -1)
+        if self.use_rnn:
+            act, next_state = self.model.predict(obs, state=self.state, 
+                                                mask=self.mask, deterministic=True)
+            self.state = next_state
+            self.mask = [False]
+            act = act[0]
+        else:
+            act, _ = self.model.predict(obs, deterministic=True)
         cmd_msg = TwistStamped()
         cmd_msg.header.stamp = rospy.Time.now()
         cmd_msg.twist.linear.x = act[0] * 2.5
@@ -440,5 +404,5 @@ if __name__ == "__main__":
     args = parser().parse_args()
     name_space = "uav" + str(args.id)
     rospy.init_node(name_space + "_RL_control")
-    track_control = RLTrack(MODEL_NAME, name_space, args.use_esti)
+    track_control = RLTrack(MODEL_NAME, name_space, args.use_esti, USE_RNN)
     rospy.spin()

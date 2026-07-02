@@ -112,7 +112,7 @@ class GimbalEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 40, 2 * M_PI, 512, 10.0, 0.4};
+  Lidar2D lidar_{-20, 20, -20, 20, 2 * M_PI, 512, 10.0, 0.4};
   DetectSim detect_;
   Logger logger_{"GimbalEnv"};
   Scalar gimbalY_, gimbalWz_;

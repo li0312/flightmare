@@ -114,7 +114,7 @@ class TrackEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar_{-20, 20, -15, 15, 2 * M_PI, 512, 8.0, 0.25};
   DetectSim detect_;
   Logger logger_{"Env"};
 

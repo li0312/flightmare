@@ -48,7 +48,7 @@ class ObstacleLidarSim {
       nh_.createTimer(ros::Duration(0.01), &ObstacleLidarSim::update, this);
 
 
-    lidar2d_sim_.generateRandomMap(50, 50);
+    lidar2d_sim_.generateRandomMap(40, 25);
     obstacles_ = lidar2d_sim_.getObstacles();
     // // 初始化地图
     // for (int i = 0; i < 200; ++i) {
@@ -388,7 +388,7 @@ class ObstacleLidarSim {
   Timer map_timer_{"Map"};
   Logger logger_{"lidar2d_test"};
 
-  Lidar2D lidar2d_sim_{40, 40, 2 * M_PI, 512, 5.0, 0.4};
+  Lidar2D lidar2d_sim_{-20, 20, -20, 20, 2 * M_PI, 512, 5.0, 0.4};
 
 
   std::vector<std::shared_ptr<Obstacle>> obstacles_;

@@ -138,6 +138,30 @@ target_link_libraries(lac_drone_node
   stdc++fs
 )
 
+
+# dataset generator
+cs_add_library(dataset_generator
+    src/multi_track/dataset_generator.cpp
+)
+
+target_link_libraries(dataset_generator
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
+cs_add_executable(dataset_gen
+   src/multi_track/dataset_gen.cpp
+)
+
+target_link_libraries(dataset_gen
+  dataset_generator
+  ${OpenCV_LIBRARIES}
+  ${VTK_LIBRARIES}
+  stdc++fs
+)
+
 # motion_planning
 
 if(BUILD_MP)
@@ -264,6 +288,19 @@ cs_add_executable(lidar2d_sim
 )
 
 target_link_libraries(lidar2d_sim
+${catkin_LIBRARIES}
+${OpenCV_LIBRARIES}
+stdc++fs
+zmq
+zmqpp
+)
+
+# lac_test
+cs_add_executable(target_test
+    src/lac_test/target_test.cpp
+)
+
+target_link_libraries(target_test
 ${catkin_LIBRARIES}
 ${OpenCV_LIBRARIES}
 stdc++fs

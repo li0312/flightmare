@@ -32,10 +32,13 @@ LacDrone::LacDrone(const ros::NodeHandle& nh, const ros::NodeHandle& pnh)
   if (droneID_ < 0) {
     ROS_WARN("DroneID load failure!!");
   } else if (droneID_ == 0) {
-    quad_state_.x[QS::POSX] = -3.0;
+    quad_state_.x[QS::POSX] = -3.0 / sqrt(2.0);
+    quad_state_.x[QS::POSY] = 3.0 / sqrt(2.0);
+    yaw = -M_PI_4;
   } else if (droneID_ == 1) {
-    quad_state_.x[QS::POSY] = -3.0;
-    yaw = M_PI_2;
+    quad_state_.x[QS::POSX] = -3.0 / sqrt(2.0);
+    quad_state_.x[QS::POSY] = -3.0 / sqrt(2.0);
+    yaw = M_PI_4;
   }
   quad_state_.x[QS::POSZ] = 0.8;
   quad_state_.x[QS::ATTW] = std::cos(yaw / 2.0);
@@ -100,10 +103,11 @@ void LacDrone::cmdCallback(const geometry_msgs::TwistStamped::ConstPtr& msg) {
 
   if (dt > 0.1) return;
   // quad_ptr_->velocityControlBody(cmd_, dt);
+  Scalar k_v = 0.75;
   cmd_.t += dt;
-  cmd_.linear.x() = msg->twist.linear.x;
-  cmd_.linear.y() = msg->twist.linear.y;
-  cmd_.angular.z() = msg->twist.angular.z;
+  cmd_.linear.x() = k_v * msg->twist.linear.x + (1 - k_v) * cmd_.linear.x();
+  cmd_.linear.y() = k_v * msg->twist.linear.y + (1 - k_v) * cmd_.linear.y();
+  cmd_.angular.z() = k_v * msg->twist.angular.z + (1 - k_v) * cmd_.angular.z();
   quad_ptr_->simpleVelControlBody(cmd_, dt);
   ROS_INFO("CMD: [%.2f, %.2f, %.2f] | %.2f", cmd_.linear.x(), cmd_.linear.y(),
            cmd_.angular.z(), dt);
@@ -163,7 +167,7 @@ void LacDrone::mainLoopCallback(const ros::TimerEvent& event) {
   scan2d.time_increment = 0;
   scan2d.scan_time = 0.1;
   scan2d.range_min = 0.1;
-  scan2d.range_max = 6.0;
+  scan2d.range_max = 5.0;
   bool has_collision_2d =
     lidar2d_.simulateLidar(quad_state_, scan2d.ranges, 0.2, false);
   scan2d_pub_.publish(scan2d);
@@ -177,8 +181,10 @@ void LacDrone::mainLoopCallback(const ros::TimerEvent& event) {
     Scalar yaw = quad_state_.euler_xyz().z();
     Scalar target_yaw = target_xyY_.z();
     Scalar theta = target_xyY_.z() - yaw;
-    if (droneID_ == 1) {
-      theta += M_PI_2;
+    if (droneID_ == 0) {
+      theta -= M_PI_4;
+    } else if (droneID_ == 1) {
+      theta += M_PI_4;
     }
     geometry_msgs::PoseStamped box_msg;
     box_msg.header.stamp = local_cloud_msg.header.stamp;

@@ -1,7 +1,7 @@
 '''
 Author: Lac_Creeper
 Date: 2026-03-06 19:02:48 +0800
-LastEditTime: 2026-03-11 18:31:02 +0800
+LastEditTime: 2026-05-30 22:44:04 +0800
 LastEditors: Lac_Creeper
 Description: 
 FilePath: /src/flightmare/flightrl/examples/trackAdv_control.py
@@ -56,19 +56,19 @@ def test_model(env, model):
             state = next_state
             mask = [done]
             ep_len += 1
-            if ep_len > 3000:
+            if ep_len > 10000:
                 break
         ep_num += 1
 
 
 def my_schedule(initial_value=3e-4, final_value=3e-5):
     def schedule(progress):
-        if progress >= 0.8:
+        if progress >= 0.75:
             return initial_value
         elif progress <= 0.25:
             return final_value
         else:
-            return final_value + (initial_value - final_value) * progress
+            return final_value + (initial_value - final_value) * (progress - 0.25) / 0.5
     return schedule
 
 
@@ -93,6 +93,30 @@ def parser():
                         help='trained weight path')
     return parser
 
+
+best_mean_reward = -np.inf
+
+def best_model_callback(_locals, _globals):
+    global best_mean_reward
+    
+    self_obj = _locals['self']
+    log_dir = _locals['log_dir']
+    update = _locals['update']
+    ep_info_buf = self_obj.ep_info_buf
+    if update % 100 == 0 and len(ep_info_buf) > 0:
+        mean_reward = np.mean([ep_info['r'] for ep_info in ep_info_buf])
+        mean_reward = int(mean_reward)
+        save_path = os.path.join(log_dir, f'model_{update}_{mean_reward}.zip')
+        self_obj.save(save_path)
+
+    if len(ep_info_buf) > 0 and len(ep_info_buf[0]) > 0:
+        mean_reward = np.mean([ep_info['r'] for ep_info in ep_info_buf])
+        if mean_reward > best_mean_reward:
+            best_mean_reward = mean_reward
+            save_path = os.path.join(log_dir, 'best_model.zip')
+            print(f"New best mean reward: {best_mean_reward:.2f} at update {update}, saving model to {save_path}")
+            self_obj.save(save_path)
+    return True  # 返回True继续训练，返回False可以中断训练
 
 def main():
     args = parser().parse_args()
@@ -120,7 +144,7 @@ def main():
     if args.train:
         # save the configuration and other files
         rsg_root = os.path.dirname(os.path.abspath(__file__))
-        log_dir = rsg_root + '/trackAdv_saved'
+        log_dir = rsg_root + '/trackNewAdv_saved'
         saver = U.ConfigurationSaver(log_dir=log_dir)
         # model = PPO2(
         #     tensorboard_log=saver.data_dir,
@@ -131,7 +155,7 @@ def main():
         #     # n_steps=math.floor(cfg['env']['max_time'] / cfg['env']['ctl_dt']),
         #     n_steps=300,
         #     ent_coef=0.00,
-        #     learning_rate=my_schedule(5e-4, 3e-5),
+        #     learning_rate=my_schedule(3e-4, 3e-5),
         #     vf_coef=0.5,
         #     max_grad_norm=0.5,
         #     nminibatches=1,
@@ -139,7 +163,8 @@ def main():
         #     cliprange=0.2,
         #     verbose=1,
         # )
-        model = PPO2.load(log_dir + '/2026-01-14-00-55-13.zip', env=env, tensorboard_log=saver.data_dir)
+        model = PPO2.load(log_dir + '/2026-04-09-05-31-37.zip', env=env, tensorboard_log=saver.data_dir)
+        # print("Model loaded successfully.")
 
         # tensorboard
         # Make sure that your chrome browser is already on.
@@ -152,8 +177,10 @@ def main():
         # 2000000000 is 4000 iterations.
         logger.configure(folder=saver.data_dir)
         model.learn(
-            total_timesteps=int(72000000),
-            log_dir=saver.data_dir, logger=logger)
+            total_timesteps=int(60000000),
+            log_dir=saver.data_dir, 
+            logger=logger,
+            callback=best_model_callback)
         model.save(saver.data_dir)
 
     # # Testing mode with a trained weight

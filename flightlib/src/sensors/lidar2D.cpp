@@ -266,9 +266,9 @@ bool AABBTree::rayIntersect(const Vector<2>& origin, const Vector<2>& dir,
 }
 
 
-Lidar2D::Lidar2D(Scalar mapWidth, Scalar mapHeight, Scalar fov, int numRays,
-                 Scalar maxRange, Scalar safe_range)
-  : mapBounds_(Vector<2>(0, 0), Vector<2>(mapWidth, mapHeight)),
+Lidar2D::Lidar2D(Scalar mapXmin, Scalar mapXmax, Scalar mapYmin, Scalar mapYmax,
+                 Scalar fov, int numRays, Scalar maxRange, Scalar safe_range)
+  : mapBounds_(Vector<2>(mapXmin, mapYmin), Vector<2>(mapXmax, mapYmax)),
     fov_(fov),
     numRays_(numRays),
     maxRange_(maxRange),
@@ -305,11 +305,12 @@ void Lidar2D::generateRandomMap(int numRectangles, int numEllipses,
 
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<Scalar> posX(-mapBounds_.max().x() / 2,
-                                              mapBounds_.max().x() / 2);
-  std::uniform_real_distribution<Scalar> posY(-mapBounds_.max().y() / 2,
-                                              mapBounds_.max().y() / 2);
-  std::uniform_real_distribution<Scalar> size(0.3, 1.0);
+  std::uniform_real_distribution<Scalar> posX(mapBounds_.min().x(),
+                                              mapBounds_.max().x());
+  std::uniform_real_distribution<Scalar> posY(mapBounds_.min().y(),
+                                              mapBounds_.max().y());
+  std::uniform_real_distribution<Scalar> size(0.3, 0.8);
+  // std::uniform_real_distribution<Scalar> size(0.3, 1.0);
   std::uniform_real_distribution<Scalar> angle(0, M_PI);
 
   auto safeArea = 
@@ -509,9 +510,9 @@ bool Lidar2D::simulateLidar(const Vector<2>& robotPos, Scalar robotAngle,
   is_collision_ = is_collision;
   if (is_norm) {
     for (int i = 0; i < numRays_; ++i) {
-      // ranges[i] = ranges[i] / maxRange_ - 0.5;
+      ranges[i] = ranges[i] / maxRange_ - 0.5;
       // ranges[i] = exp(-2.5 * ranges[i]);
-      ranges[i] = exp(-1.0 * ranges[i]);
+      // ranges[i] = exp(-1.0 * ranges[i]);
     }
   }
   return is_collision;

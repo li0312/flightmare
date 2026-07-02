@@ -49,6 +49,23 @@ struct BBox {
     return (union_area > 0) ? (inter_area / union_area) : 0.0f;
   }
 
+  BBox norm_box(Scalar cw = 63) const {
+    BBox norm_bbox;
+    Scalar cu = (u_min + u_max) / 2.0;
+    norm_bbox.u_min = static_cast<int>(cu - cw / 2.0);
+    norm_bbox.u_max = static_cast<int>(cu + cw / 2.0);
+    norm_bbox.v_min = v_min;
+    norm_bbox.v_max = v_max;
+    return norm_bbox;
+  }
+
+  Scalar IoU2(const BBox& other) const {
+    Scalar cw = other.u_max - other.u_min;
+    BBox norm_this = this->norm_box(cw);
+
+    return norm_this.IoU(other);
+  }
+
   bool is_valid() const { return (u_max > u_min) && (v_max > v_min); }
 
   friend std::ostream& operator<<(std::ostream& os, const BBox& bbox) {
@@ -84,6 +101,7 @@ class DetectSim : SensorBase {
   bool getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB,
                BBox& out_bbox);
   bool getBBox(const QuadState& state, BBox& out_bbox);
+  bool getBBox(const Ref<Vector<4>> state, BBox& out_bbox);
   bool getBBoxG(const QuadState& state, BBox& out_bbox);
   Matrix<4, 4> getRelPose() const;
   int getWidth() const;

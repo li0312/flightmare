@@ -94,7 +94,7 @@ class LacDrone {
   // Sensor
   bool has_target_{false};
   Lidar lidar_;
-  Lidar2D lidar2d_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar2d_{-20, 20, -15, 15, 2 * M_PI, 512, 5.0, 0.2};
   DetectSim detect_;
   sensor_msgs::LaserScan scan_msg_;
   sensor_msgs::LaserScan scan2d_msg_;

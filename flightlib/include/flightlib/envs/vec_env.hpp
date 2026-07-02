@@ -19,6 +19,7 @@
 #include "flightlib/envs/track_env/track_env.hpp"
 #include "flightlib/envs/gimbal_env/gimbal_env.hpp"
 #include "flightlib/envs/trackAdv_env/trackAdv_env.hpp"
+#include "flightlib/envs/trackMult_env/trackMult_env.hpp"
 
 namespace flightlib {
 

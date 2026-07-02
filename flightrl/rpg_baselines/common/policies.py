@@ -19,35 +19,43 @@ from rpg_baselines.common.distributions import make_proba_dist_type, Categorical
 def laser_conv(input_tensor, scope="laser_conv"):
     with tf.variable_scope(scope):
         input_tensor = tf.expand_dims(input_tensor, axis=-1)
-        conv1 = tf.layers.conv1d(input_tensor, filters=16, 
-                    kernel_size=5, strides=2, activation=tf.nn.relu,
-                    kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+        conv1 = tf.layers.conv1d(input_tensor, filters=8, 
+                    kernel_size=5, strides=2, activation=tf.nn.relu, 
+                    padding="same",
+                    # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                     name="laser_conv1")
-        conv2 = tf.layers.conv1d(conv1, filters=16, 
+        conv2 = tf.layers.conv1d(conv1, filters=8, 
                     kernel_size=3, strides=2, activation=tf.nn.relu,
-                    kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+                    padding="same",
+                    # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                     name="laser_conv2")
         flattened = tf.layers.flatten(conv2)
         laser_features = tf.layers.dense(flattened, units=128, 
                     activation=tf.nn.relu,
-                    kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+                    # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                     name="laser_fc")
     return laser_features
 
 def adv_mlp(input_tensor):
     laser = input_tensor[:, :512]
-    det = input_tensor[:, 512:521]
-    theta = input_tensor[:, 521:523]
-    egoState = input_tensor[:, 523:]
+    other = input_tensor[:, 512:]
 
     laser_features = laser_conv(laser)
-    merged_features = tf.concat([laser_features, det, theta, egoState], axis=1)
+    merged_features = tf.concat([laser_features, other], axis=1)
 
-    merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128, init_scale=np.sqrt(2)))
-    latent_policy = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+    merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128, 
+                            #    init_scale=np.sqrt(2)
+                               ))
+    latent_policy = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64, 
+                                    #   init_scale=np.sqrt(2)
+                                      ))
 
-    latent_value = tf.nn.relu(linear(merged_features, 'vf_fc1', n_hidden=64, init_scale=np.sqrt(2)))
-    latent_value = tf.nn.relu(linear(latent_value, 'vf_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+    latent_value = tf.nn.relu(linear(merged_features, 'vf_fc1', n_hidden=64, 
+                                    #  init_scale=np.sqrt(2)
+                                     ))
+    latent_value = tf.nn.relu(linear(latent_value, 'vf_fc2', n_hidden=64, 
+                                    #  init_scale=np.sqrt(2)
+                                     ))
 
     return latent_policy, latent_value
 
@@ -66,26 +74,26 @@ def scan_conv(input_tensor):
     print(laser.shape)
     conv1 = tf.layers.conv1d(laser, filters=16, 
                 kernel_size=5, strides=2, activation=tf.nn.relu,
-                kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+                # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                 name="laser_conv1")
     conv2 = tf.layers.conv1d(conv1, filters=16, 
                 kernel_size=3, strides=2, activation=tf.nn.relu,
-                kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+                # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                 name="laser_conv2")
     flattened = tf.layers.flatten(conv2)
     laser_features = tf.layers.dense(flattened, units=128, 
                 activation=tf.nn.relu,
-                kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
+                # kernel_initializer=tf.orthogonal_initializer(np.sqrt(2)),
                 name="laser_fc")
 
 
     merged_features = tf.concat([laser_features, other_obs], axis=1)
 
-    latent_policy = tf.nn.relu(linear(merged_features, 'pi_fc1', n_hidden=128, init_scale=np.sqrt(2)))
-    latent_policy = tf.nn.relu(linear(latent_policy, 'pi_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+    latent_policy = tf.nn.relu(linear(merged_features, 'pi_fc1', n_hidden=64))
+    latent_policy = tf.nn.relu(linear(latent_policy, 'pi_fc2', n_hidden=64))
 
-    latent_value = tf.nn.relu(linear(merged_features, 'vf_fc1', n_hidden=64, init_scale=np.sqrt(2)))
-    latent_value = tf.nn.relu(linear(latent_value, 'vf_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+    latent_value = tf.nn.relu(linear(merged_features, 'vf_fc1', n_hidden=64))
+    latent_value = tf.nn.relu(linear(latent_value, 'vf_fc2', n_hidden=64))
 
     return latent_policy, latent_value
         
@@ -640,15 +648,89 @@ class LaserLstmPolicy(RecurrentActorCriticPolicy):
 
         with tf.variable_scope("model", reuse=reuse):
             laser = self.processed_obs[:, :512]
-            det = self.processed_obs[:, 512:521]
-            theta = self.processed_obs[:, 521:523]
-            egoState = self.processed_obs[:, 523:]
+            other_obs = self.processed_obs[:, 512:]
+            # det = self.processed_obs[:, 512:521]
+            # theta = self.processed_obs[:, 521:523]
+            # egoState = self.processed_obs[:, 523:]
 
             laser_features = laser_conv(laser)
-            merged_features = tf.concat([laser_features, det, theta, egoState], axis=1)
+            merged_features = tf.concat([laser_features, other_obs], axis=1)
 
-            merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128, init_scale=np.sqrt(2)))
-            extracted_features = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+            merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128, 
+                                    #    init_scale=np.sqrt(2)
+                                       ))
+            extracted_features = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64, 
+                                                #    init_scale=np.sqrt(2)
+                                                   ))
+
+            input_sequence = batch_to_seq(extracted_features, self.n_env, n_steps)
+            masks = batch_to_seq(self.dones_ph, self.n_env, n_steps)
+            rnn_output, self.snew = lstm(input_sequence, masks, self.states_ph, 'lstm1', n_hidden=n_lstm,
+                                         layer_norm=layer_norm)
+            rnn_output = seq_to_batch(rnn_output)
+            value_fn = linear(rnn_output, 'vf', 1)
+
+            self._proba_distribution, self._policy, self.q_value = \
+                self.pdtype.proba_distribution_from_latent(rnn_output, rnn_output)
+            
+            self._value_fn = value_fn
+
+        self._setup_init()
+
+    def step(self, obs, state=None, mask=None, deterministic=False):
+        if deterministic:
+            return self.sess.run([self.tanh_deterministic_action, 
+                                  self.value_flat, self.snew, self.neglogp],
+                                 {self.obs_ph: obs, self.states_ph: state, self.dones_ph: mask})
+        else:
+            return self.sess.run([self.tanh_action, self.action, 
+                                self.value_flat, self.snew, self.tanh_neglogp],
+                                 {self.obs_ph: obs, self.states_ph: state, self.dones_ph: mask})
+
+    def proba_step(self, obs, state=None, mask=None):
+        return self.sess.run(self.policy_proba, {self.obs_ph: obs, self.states_ph: state, self.dones_ph: mask})
+
+    def value(self, obs, state=None, mask=None):
+        return self.sess.run(self.value_flat, {self.obs_ph: obs, self.states_ph: state, self.dones_ph: mask})
+    
+
+
+class MultLstm(RecurrentActorCriticPolicy):
+    """
+    Policy object that implements actor critic, using LSTMs.
+
+    :param sess: (TensorFlow session) The current TensorFlow session
+    :param ob_space: (Gym Space) The observation space of the environment
+    :param ac_space: (Gym Space) The action space of the environment
+    :param n_env: (int) The number of environments to run
+    :param n_steps: (int) The number of steps to run for each environment
+    :param n_batch: (int) The number of batch to run (n_envs * n_steps)
+    :param n_lstm: (int) The number of LSTM cells (for recurrent policies)
+    :param reuse: (bool) If the policy is reusable or not
+    """
+
+    recurrent = True
+
+    def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, n_lstm=64, reuse=False, layer_norm=False, feature_extraction="laser_conv",
+                 **kwargs):
+        # state_shape = [n_lstm * 2] dim because of the cell and hidden states of the LSTM
+        super(MultLstm, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch,
+                                         state_shape=(2 * n_lstm, ), reuse=reuse,
+                                         scale=(feature_extraction == "cnn"))
+
+        # self._kwargs_check(feature_extraction, kwargs)
+
+        with tf.variable_scope("model", reuse=reuse):
+            laser = self.processed_obs[:, :512]
+            other = self.processed_obs[:, 512:]
+
+            laser_features = laser_conv(laser)
+            merged_features = tf.concat([laser_features, other], axis=1)
+
+            # merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128, init_scale=np.sqrt(2)))
+            # extracted_features = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64, init_scale=np.sqrt(2)))
+            merged = tf.nn.relu(linear(merged_features, 'merged_fc1', n_hidden=128))
+            extracted_features = tf.nn.relu(linear(merged, 'merged_fc2', n_hidden=64))
 
             input_sequence = batch_to_seq(extracted_features, self.n_env, n_steps)
             masks = batch_to_seq(self.dones_ph, self.n_env, n_steps)
@@ -915,7 +997,8 @@ _policy_registry = {
         "MlpLnLstmPolicy": MlpLnLstmPolicy,
         "LaserLstmPolicy": LaserLstmPolicy,
         "LaserPolicy": LaserPolicy,
-        "LaserMlpPolicy": LaserMlpPolicy
+        "LaserMlpPolicy": LaserMlpPolicy,
+        "MultLstm": MultLstm
     }
 }
 

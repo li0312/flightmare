@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 import numpy as np
+from tqdm import tqdm
 
 from data_loader import create_data_loaders, UAVTrackingDataset
 from models import create_model
@@ -90,6 +91,8 @@ class Trainer:
         
         total_loss = 0.0
         num_batches = 0
+
+        print(len(self.train_loader))
         
         for batch_idx, (x, y) in enumerate(self.train_loader):
             x = x.to(self.device)
@@ -268,11 +271,11 @@ def main():
     # 配置
     config = {
         # 数据配置
-        'data_dir': './data',
-        'train_meta': './data/train_files.txt',
-        'val_meta': './data/val_files.txt',
-        'batch_size': 32,
-        'sequence_length': 4,  # 时序长度
+        'data_dir': './dataset',
+        'train_meta': './dataset/train_files.txt',
+        'val_meta': './dataset/val_files.txt',
+        'batch_size': 100,
+        'sequence_length': 20,  # 时序长度
         'num_workers': 4,
         
         # 模型配置

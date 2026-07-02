@@ -124,8 +124,8 @@ class Lidar2D {
   bool is_collision_;
 
  public:
-  Lidar2D(Scalar mapWidth, Scalar mapHeight, Scalar fov, int numRays,
-          Scalar maxRange, Scalar safe_range);
+  Lidar2D(Scalar mapXmin, Scalar mapXmax, Scalar mapYmin, Scalar mapYmax,
+          Scalar fov, int numRays, Scalar maxRange, Scalar safe_range);
 
   void addRectangle(Vector<2> center, Scalar width, Scalar height,
                     Scalar angle);

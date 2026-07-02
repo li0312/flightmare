@@ -130,10 +130,10 @@ class MultiTrack final : public EnvBase {
   Command cmd1_;
   Command cmd2_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
-  Lidar2D lidar0_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
-  Lidar2D lidar1_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
-  Lidar2D lidar2_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar_{-20, 20, -15, 15, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar0_{-20, 20, -15, 15, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar1_{-20, 20, -15, 15, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar2_{-20, 20, -15, 15, 2 * M_PI, 512, 8.0, 0.25};
   DetectSim detect_;
   DetectSim detect0_;
   DetectSim detect1_;

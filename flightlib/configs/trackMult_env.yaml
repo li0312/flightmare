@@ -1,0 +1,28 @@
+track_env:
+   sim_dt: 0.05
+   max_t: 15.0
+   use_ros: 0
+   fine_turn: 0
+   random: 1
+   tMaxV: 0.8
+   traj: 3  # 0: ELLIPSE, 1: TRIANGLE, 2: FIGURE_EIGHT, 3: RANDOM_WALK
+   load_map: 1
+   map_num: 3
+
+quadrotor_dynamics:
+  mass: 0.73
+  arm_l: 0.17
+  motor_omega_min: 150.0 # motor rpm min
+  motor_omega_max: 3000.0 # motor rpm max
+  motor_tau: 0.0001 # motor step response
+  thrust_map: [1.3298253500372892e-06, 0.0038360810526746033, -1.7689986848125325]
+  kappa: 0.016 # rotor drag coeff
+  omega_max: [3.0, 3.0, 3.0]  # body rate constraint (x, y, z) 
+
+rl:
+  detect_coeff: 0.2   # 0.2
+  dist_coeff: 2.0     # 2.5
+  alpha_coeff: 0.2    # 0.5
+  beta_coeff: 0.2
+  theta_coeff: 0.01
+  act_coeff: 0.0025

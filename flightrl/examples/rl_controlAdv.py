@@ -35,7 +35,8 @@ from cv_bridge import CvBridge
 
 
 WINDOW_SIZE = 5
-MODEL_NAME = "/home/lac/fm_test/src/flightmare/flightrl/examples/trackAdv_saved/2026-03-10-14-52-51.zip"
+MODEL_NAME = "/home/lac/fm_test/src/flightmare/flightrl/examples/trackNewAdv_saved/2026-04-09-05-31-37.zip"       # BEST
+# MODEL_NAME = "/home/lac/fm_test/src/flightmare/flightrl/examples/trackNewAdv_saved/2026-04-09-02-05-05.zip"
 USE_RNN = False
 if (MODEL_NAME.find("Adv") >= 0):
     USE_RNN = True
@@ -263,7 +264,8 @@ class RLTrack():
         
     def scanCB(self, msg: LaserScan):
         scan = msg.ranges
-        scan_norm = [np.exp(-i) for i in scan]
+        scan_norm = [i / 5.0 - 0.5 for i in scan]
+        # scan_norm = [np.exp(-i) for i in scan]
         self.scan_norm = scan_norm
     
     def otherOdomCB(self, msg: Odometry):
@@ -359,7 +361,9 @@ class RLTrack():
         
         bbox_obs = [((umin + umax) / 2.0 - 480.0) / 960.0,
                     ((vmin + vmax) / 2.0 - 260.0) / 540.0,
-                    (vmax - vmin - 210.0) / 540.0]
+                    (vmax - vmin - 210.0) / 540.0,
+                    msg.pose.position.x,
+                    msg.pose.position.y]
         if not self.box_list:
             self.box_list = [bbox_obs, bbox_obs, bbox_obs]
         else:
@@ -373,7 +377,7 @@ class RLTrack():
             return
         scan_flat = np.array(self.scan_norm)
         detect_obs = np.array(self.box_list).reshape(-1)
-        other_obs = np.array(self.dirt + self.vel)
+        other_obs = np.array(self.vel)
         obs = np.concatenate((scan_flat, detect_obs))
         obs = np.concatenate((obs, other_obs)).reshape(1, -1)
         if self.use_rnn:
@@ -386,8 +390,8 @@ class RLTrack():
             act, _ = self.model.predict(obs, deterministic=True)
         cmd_msg = TwistStamped()
         cmd_msg.header.stamp = rospy.Time.now()
-        cmd_msg.twist.linear.x = act[0] * 2.5
-        cmd_msg.twist.linear.y = act[1] * 2.0
+        cmd_msg.twist.linear.x = act[0] * 3.5
+        cmd_msg.twist.linear.y = act[1] * 3.5
         cmd_msg.twist.angular.z = act[2] * 0.5
         self.cmd_pub.publish(cmd_msg)
         rospy.loginfo("CMD: [%.2f, %.2f, %.2f]"%(cmd_msg.twist.linear.x,

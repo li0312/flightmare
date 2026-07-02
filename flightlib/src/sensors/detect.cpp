@@ -1,7 +1,7 @@
 /*** 
  * @Author: Lac_Creeper
  * @Date: 2025-05-20 21:38:23 +0800
- * @LastEditTime: 2026-03-06 09:05:55 +0800
+ * @LastEditTime: 2026-03-23 00:47:05 +0800
  * @LastEditors: Lac_Creeper
  * @Description: 
  * @FilePath: /src/flightmare/flightlib/src/sensors/detect.cpp
@@ -92,6 +92,16 @@ bool DetectSim::getBBox(const Ref<Vector<3>> t_WB, const Ref<Matrix<3, 3>> R_WB,
 bool DetectSim::getBBox(const QuadState& state, BBox& out_bbox) {
   Vector<3> t_WB = state.p;
   Matrix<3, 3> R_WB = state.R();
+  return getBBox(t_WB, R_WB, out_bbox);
+}
+
+bool DetectSim::getBBox(const Ref<Vector<4>> state, BBox& out_bbox) {
+  Vector<3> t_WB = state.head<3>();
+  Scalar yaw = state(3);
+  Matrix<3, 3> R_WB;
+  R_WB << cos(yaw), -sin(yaw), 0,
+          sin(yaw), cos(yaw),  0,
+          0,        0,         1;
   return getBBox(t_WB, R_WB, out_bbox);
 }
 

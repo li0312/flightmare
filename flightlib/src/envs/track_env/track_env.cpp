@@ -366,6 +366,9 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
     (last_dist_ - dist) * dist_coeff_ + (alpha - 1) * alpha_coeff_;
   last_alpha_ = alpha;
   last_dist_ = dist;
+  if (dist > 0.8) {
+    pos_reward -= std::min(0.05, 0.05 * (dist - 0.8));
+  }
 
   // - theta term
   /// TODO: add direction vector reward
@@ -388,7 +391,7 @@ Scalar TrackEnv::step(const Ref<Vector<>> act, Ref<Vector<>> obs) {
   //   acc_punish = -0.1;
   // }
   Scalar act_reward =
-    -0.005 * act_norm - 0.05 * vel_diff.norm();
+    -0.002 * act_norm - 0.02 * vel_diff.norm();
   // if (act_norm < 2.0) {
   //   act_norm = 0.0;
   // }

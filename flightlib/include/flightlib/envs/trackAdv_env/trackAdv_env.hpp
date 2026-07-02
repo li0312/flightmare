@@ -27,6 +27,7 @@
 #include "flightlib/common/quad_state.hpp"
 #include "flightlib/envs/env_base.hpp"
 #include "flightlib/objects/quadrotor.hpp"
+#include "flightlib/objects/target.hpp"
 #include "flightlib/sensors/detect.hpp"
 #include "flightlib/sensors/lidar.hpp"
 #include "flightlib/sensors/lidar2D.hpp"
@@ -43,22 +44,51 @@ enum Ctl : int {
   kNLaser = 512,
   kDetect1 = 512,
   kNDetect1 = 3,
-  kDetect2 = 515,
+  kDirt1 = 515,
+  kNDirt1 = 2,
+  kDetect2 = 517,
   kNDetect2 = 3,
-  kDetect3 = 518,
+  kDirt2 = 520,
+  kNDirt2 = 2,
+  kDetect3 = 522,
   kNDetect3 = 3,
-  kDirt = 521,
-  kNDirt = 2,
-  kState = 523,
+  kDirt3 = 525,
+  kNDirt3 = 2,
+  kState = 527,
   kNState = 3,
 
-  kNObs = 526,
+  kNObs = 530,
 
   // control actions
   kAct = 0,
   kNAct = 3,
 
 };
+
+// enum Ctl : int {
+//   // observations
+//   kObs = 0,
+//   //
+//   kLaser = 0,
+//   kNLaser = 512,
+//   kDetect1 = 512,
+//   kNDetect1 = 3,
+//   kDetect2 = 515,
+//   kNDetect2 = 3,
+//   kDetect3 = 518,
+//   kNDetect3 = 3,
+//   kDirt = 521,
+//   kNDirt = 2,
+//   kState = 523,
+//   kNState = 3,
+
+//   kNObs = 526,
+
+//   // control actions
+//   kAct = 0,
+//   kNAct = 3,
+
+// };
 };  // namespace trackAdvenv
 class TrackAdvEnv final : public EnvBase {
  public:
@@ -107,6 +137,11 @@ class TrackAdvEnv final : public EnvBase {
   Scalar target_maxV_;
   Scalar target_V_;
   Scalar tMaxV_;
+  Target target_{Vector<3>{3.0f, 0.0f, 0.0f}, TrajectoryType::TRIANGLE,
+                 1.0f};
+  int target_traj_;
+  int load_map_{0};
+  int map_num_{0};
 
 
   // quadrotor
@@ -114,7 +149,8 @@ class TrackAdvEnv final : public EnvBase {
   QuadState quad_state_;
   Command cmd_;
   // Lidar lidar_;
-  Lidar2D lidar_{40, 30, 2 * M_PI, 512, 8.0, 0.25};
+  Lidar2D lidar_{-18, 22, -18, 18, 2 * M_PI, 512, 5.0, 0.2};
+  // Lidar2D lidar_{-20, 20, -15, 15, 2 * M_PI, 512, 5.0, 0.2};
   DetectSim detect_;
   Logger logger_{"TrackAdvEnv"};
 
@@ -125,6 +161,8 @@ class TrackAdvEnv final : public EnvBase {
   Scalar detect_coeff_, dist_coeff_, alpha_coeff_, pos_coeff_, theta_coeff_, act_coeff_;
   int use_ros_, fine_turn_, random_;
   Scalar traj_param_;
+  Scalar randV_;
+  int traj_type_;
   Vector<3> targetInitPose_;
   Scalar last_alpha_, last_dist_, last_theta_;
   bool has_init_reward_;

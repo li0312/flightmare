@@ -4,7 +4,10 @@ track_env:
    use_ros: 1
    fine_turn: 0
    random: 0
-   tMaxV: 1.0
+   tMaxV: 0.5
+   traj: 3  # 0: ELLIPSE, 1: TRIANGLE, 2: FIGURE_EIGHT, 3: RANDOM_WALK
+   load_map: 1
+   map_num: 3
 
 quadrotor_dynamics:
   mass: 0.73
@@ -18,8 +21,8 @@ quadrotor_dynamics:
 
 rl:
   detect_coeff: 0.2   # 0.2
-  dist_coeff: 0.8     # 2.5
-  alpha_coeff: 0.4    # 0.5
+  dist_coeff: 2.0     # 2.5
+  alpha_coeff: 0.2    # 0.5
   pos_coeff: 0.0
-  theta_coeff: 0.05
+  theta_coeff: 0.2
   act_coeff: 0.0025
